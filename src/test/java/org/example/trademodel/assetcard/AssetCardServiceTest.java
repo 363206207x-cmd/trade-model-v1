@@ -22,8 +22,60 @@ class AssetCardServiceTest {
     void shadowWithoutAnyModelAccumulatesRealPipelineRecordsBeforeTrainingCanExist() throws Exception {
         // Synthetic market fixtures and a random disposable database prove wiring only, never real sample readiness.
         try (var fixture = new LabelDatabaseFixture(true, false)) {
+            var mapper = spy(fixture.mapper);
+            doReturn(new org.example.trademodel.mapper.AssetCardMapper.WriterReadiness(true, true, "ISOLATED_FIXTURE_ONLY"))
+                    .when(mapper).inspectWriterPermissions();
+            assertNoModelShadowPipeline(fixture, mapper, new AssetCardProperties());
+        }
+    }
+
+    @Test
+    void realDedicatedPostgresWriterPersistsShadowFeaturesAndMaturesBothSidesWithoutModel(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporary) throws Exception {
+        // Auth, role checks, pool and mapper routing are real; only market inputs are isolated synthetic fixtures.
+        try (var writer = AssetCardDataSourceConfigurationTest.WriterFixture.open(temporary)) {
+            assertThat(writer.mapper().inspectWriterPermissions().writable()).isTrue();
+            assertThat(writer.mapper().inspectWriterPermissions().cleanupAllowed()).isTrue();
+            var defaultJdbc = writer.context().getBean(org.springframework.jdbc.core.JdbcTemplate.class);
+            try (var connection = defaultJdbc.getDataSource().getConnection()) {
+                assertThat(connection.isReadOnly()).isTrue();
+                try (var result = connection.createStatement().executeQuery("SELECT current_user")) {
+                    assertThat(result.next()).isTrue();
+                    assertThat(result.getString(1)).isNotEqualTo("rine_asset_card_writer");
+                }
+            }
+            try (var fixture = new LabelDatabaseFixture(writer.mapper())) {
+                assertNoModelShadowPipeline(fixture, writer.mapper(), writer.properties());
+                assertThat(writer.admin().queryForObject(
+                        "SELECT count(*) FROM public.tm_asset_card_feature_history WHERE record_kind='INFERENCE'", Integer.class))
+                        .isEqualTo(1);
+                assertThat(writer.admin().queryForObject(
+                        "SELECT count(*) FROM public.tm_asset_card_feature_history WHERE record_kind='LABEL'", Integer.class))
+                        .isEqualTo(2);
+                assertThat(writer.mapper().inspectWriterPermissions().writable()).isTrue();
+                // Restart uses the same dedicated route; replay cannot produce a different or duplicate side label.
+                var before = writer.admin().queryForList(
+                        "SELECT record_key,payload_json FROM public.tm_asset_card_feature_history WHERE record_kind='LABEL' ORDER BY record_key");
+                var market = mock(AssetCardMarketDataService.class);
+                var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+                var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+                try (var restarted = new AssetCardService(writer.properties(), market, writer.mapper(), pool, events, fixture.json)) {
+                    restarted.start();
+                    ((java.util.concurrent.ScheduledExecutorService) ReflectionTestUtils.getField(restarted, "labelWorker"))
+                            .submit(() -> {}).get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    restarted.matureLabels(fixture.cutoff.plusSeconds(60));
+                    assertThat(writer.admin().queryForList(
+                            "SELECT record_key,payload_json FROM public.tm_asset_card_feature_history WHERE record_kind='LABEL' ORDER BY record_key"))
+                            .isEqualTo(before);
+                    verifyNoInteractions(events);
+                }
+            }
+        }
+    }
+
+    private static void assertNoModelShadowPipeline(LabelDatabaseFixture fixture,
+            org.example.trademodel.mapper.AssetCardMapper mapper, AssetCardProperties properties) throws Exception {
             assertThat(fixture.mapper.selectInferenceSymbols()).isEmpty();
-            var properties = new AssetCardProperties();
             properties.setEnabled(true); properties.setWriterEnabled(true);
             properties.setBarRetention(java.time.Duration.ofDays(1));
             properties.setFeatureRetention(java.time.Duration.ofDays(1));
@@ -33,9 +85,6 @@ class AssetCardServiceTest {
             assertThat(properties.getModelBundles()).isEmpty();
             assertThat(properties.getModelBundlePath()).isNull();
             assertThat(properties.isExternalCallsEnabled()).isFalse();
-            var mapper = spy(fixture.mapper);
-            doReturn(new org.example.trademodel.mapper.AssetCardMapper.WriterReadiness(true, true, "ISOLATED_FIXTURE_ONLY"))
-                    .when(mapper).inspectWriterPermissions();
             var market = mock(AssetCardMarketDataService.class);
             var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
             var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
@@ -83,11 +132,14 @@ class AssetCardServiceTest {
                 var original = labels.get();
                 assertThat(original).hasSize(2);
                 assertThat(original).allSatisfy(row -> assertThat(row.payloadJson()).contains("TIMEOUT"));
+                Set<String> sides = new java.util.HashSet<>();
                 for (var row : original) {
                     var label = fixture.json.readTree(row.payloadJson()).path("label");
+                    sides.add(label.path("side").asText());
                     assertThat(fixture.json.treeToValue(label.path("signalAsOf"), Instant.class)).isEqualTo(recordedSignalAt);
                     assertThat(label.path("signalTradeId").asLong()).isEqualTo(8001L);
                 }
+                assertThat(sides).containsExactlyInAnyOrder("LONG", "SHORT");
                 service.inferClosedBar("BTCUSDT", close, fixture.start.plusSeconds(1));
                 service.matureLabels(fixture.cutoff.plusSeconds(60));
                 assertThat(labels.get()).isEqualTo(original);
@@ -96,7 +148,6 @@ class AssetCardServiceTest {
                 assertThat(properties.getModelMode()).isEqualTo(AssetCardProperties.ModelMode.SHADOW);
                 verifyNoInteractions(events);
             }
-        }
     }
 
     @Test
@@ -215,14 +266,23 @@ class AssetCardServiceTest {
         final org.springframework.jdbc.core.JdbcTemplate jdbc;
         final org.example.trademodel.mapper.AssetCardMapper mapper;
         final org.example.trademodel.mapper.AssetCardMapper.TypedHistory inference;
+        final boolean ownedH2;
         LabelDatabaseFixture() throws Exception { this(true); }
         LabelDatabaseFixture(boolean horizon) throws Exception { this(horizon, true); }
         LabelDatabaseFixture(boolean horizon, boolean seedInference) throws Exception {
             var ds=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:label_"+java.util.UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");
             try(var connection=ds.getConnection()) { assertThat(connection.getMetaData().getURL()).startsWith("jdbc:h2:mem:label_"); }
             jdbc=new org.springframework.jdbc.core.JdbcTemplate(ds);
+            ownedH2=true;
             for(String sql:java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/db/migration/V24__asset_card_live_signal.sql")).split(";")) if(!sql.isBlank()) jdbc.execute(sql);
             mapper=new org.example.trademodel.mapper.AssetCardMapper(jdbc);
+            inference=seedPipeline(horizon,seedInference);
+        }
+        LabelDatabaseFixture(org.example.trademodel.mapper.AssetCardMapper dedicatedMapper) throws Exception {
+            mapper=dedicatedMapper; jdbc=null; ownedH2=false;
+            inference=seedPipeline(true,false);
+        }
+        private org.example.trademodel.mapper.AssetCardMapper.TypedHistory seedPipeline(boolean horizon, boolean seedInference) throws Exception {
             Instant close=start.minusMillis(123).minusMillis(1);
             var bars=new java.util.LinkedHashMap<String,List<AssetCardFeatureService.Bar>>();
             for(String interval:AssetCardFeatureService.INTERVALS) bars.put(interval,closedBars(interval,close).stream().map(b -> new AssetCardFeatureService.Bar(
@@ -237,13 +297,14 @@ class AssetCardServiceTest {
             var frame=new AssetCardFeatureService().build(raw); assertThat(frame.ready()).isTrue();
             String encoded = json.writeValueAsString(Map.of("rawFrame",raw,"frame",frame,"outcome","COMPLETED","dataKind","LIVE_OBSERVED_CARD_INPUTS"));
             if (seedInference) mapper.saveInference("BTCUSDT",close,start,encoded);
-            inference = seedInference ? mapper.selectInference("BTCUSDT",close,cutoff).orElseThrow()
+            var seeded = seedInference ? mapper.selectInference("BTCUSDT",close,cutoff).orElseThrow()
                     : new org.example.trademodel.mapper.AssetCardMapper.TypedHistory("BTCUSDT",
                     org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE, "5m:" + close, close, start, encoded);
             Instant first=start.minusMillis(123);
             for(int seconds:List.of(60,300)) for(var b:labelBars(first,14700/seconds,seconds,100.5,99.5)) mapper.upsertClosedBar(new AssetCardMarketDataService.SpotBar("BTCUSDT",seconds==60?"1m":"5m",b.openTime(),b.closeTime(),
                     BigDecimal.valueOf(b.open()),BigDecimal.valueOf(b.high()),BigDecimal.valueOf(b.low()),BigDecimal.valueOf(b.close()),BigDecimal.TEN,BigDecimal.valueOf(5),10L,b.availableAt()));
             if(horizon) horizonTrade(false);
+            return seeded;
         }
         void horizonTrade(boolean late) throws Exception {
             Instant end=start.plusSeconds(14400), observed=end.minusMillis(500), available=late?end.plusNanos(1):end.minusMillis(300).plusNanos(123456);
@@ -253,7 +314,7 @@ class AssetCardServiceTest {
         }
         void saveMatured() { var pipeline=new AssetCardService.LabelPipeline(mapper,json); var item=pipeline.materialize(inference,cutoff); assertThat(item.status()).isEqualTo("MATURED"); pipeline.save(inference,item); }
         List<org.example.trademodel.mapper.AssetCardMapper.TypedHistory> labels() { return mapper.selectHistory("BTCUSDT",org.example.trademodel.mapper.AssetCardMapper.HistoryKind.LABEL,start,start,cutoff,10); }
-        @Override public void close() { jdbc.execute("SHUTDOWN"); }
+        @Override public void close() { if (ownedH2) jdbc.execute("SHUTDOWN"); }
     }
     @Test
     void matureLabelsRequireCompleteFuturePathAndUseFrozenFirstPassagePerSide() {

@@ -16,6 +16,7 @@ public class AssetCardProperties {
     private boolean enabled;
     private boolean externalCallsEnabled;
     private boolean writerEnabled;
+    private final Writer writer = new Writer();
     private Duration barRetention = Duration.ZERO;
     private Duration featureRetention = Duration.ZERO;
     private Duration tradeRetention = Duration.ZERO;
@@ -41,6 +42,36 @@ public class AssetCardProperties {
     public void setExternalCallsEnabled(boolean value) { externalCallsEnabled = value; }
     public boolean isWriterEnabled() { return writerEnabled; }
     public void setWriterEnabled(boolean value) { writerEnabled = value; }
+    public Writer getWriter() { return writer; }
+
+    /** Dedicated card connection metadata only; no password/environment-password property exists. */
+    public static final class Writer {
+        private String jdbcUrl;
+        private String expectedDatabase;
+        private Path credentialFile;
+        private String credentialOwner;
+        private int maximumPoolSize = 2;
+        private Duration connectionTimeout = Duration.ofSeconds(5);
+        public String getJdbcUrl() { return jdbcUrl; }
+        public void setJdbcUrl(String value) { jdbcUrl = value; }
+        public String getExpectedDatabase() { return expectedDatabase; }
+        public void setExpectedDatabase(String value) { expectedDatabase = value; }
+        public Path getCredentialFile() { return credentialFile; }
+        public void setCredentialFile(Path value) { credentialFile = value; }
+        public String getCredentialOwner() { return credentialOwner; }
+        public void setCredentialOwner(String value) { credentialOwner = value; }
+        public int getMaximumPoolSize() { return maximumPoolSize; }
+        public void setMaximumPoolSize(int value) {
+            if (value < 1 || value > 4) throw new IllegalArgumentException("Card writer pool must contain 1..4 connections");
+            maximumPoolSize = value;
+        }
+        public Duration getConnectionTimeout() { return connectionTimeout; }
+        public void setConnectionTimeout(Duration value) {
+            if (value == null || value.compareTo(Duration.ofMillis(250)) < 0 || value.compareTo(Duration.ofSeconds(30)) > 0)
+                throw new IllegalArgumentException("Card writer connection timeout must be 250ms..30s");
+            connectionTimeout = value;
+        }
+    }
     public Duration getBarRetention() { return barRetention; }
     public void setBarRetention(Duration value) { barRetention = retention(value); }
     public Duration getFeatureRetention() { return featureRetention; }

@@ -1,5 +1,118 @@
 # Asset-card live signal implementation evidence
 
+## Dedicated writer review correction and integration closure (2026-09-11)
+
+This is the same V42 package and Draft PR #1295, continuing clean Head
+`b46c4a3c338fe67f43a10fbbff64ae3544f175fc`. No gate, allowlist or permission
+logic was edited. Fresh GitHub metadata proves #1299 `merged=true` with actual
+merge SHA `8af9ef5b08723b6058d7320730830ea2686d29a4`; fetched `origin/main`
+matches. Both that merge and audited source
+`2921a4a98254a4bd88f3138ed4eb2e0487b3956b` are ancestors of the business Head.
+Its historical registration-phase body is not evidence that the PR is unmerged.
+The effective 64-path fingerprint remains `4262f151a513d7bec00bcc9f0614531d8cae537f`.
+The two exact previously refused paths are present in the merged list. The real
+online outer resolver returned `AUTHORIZED_IMPLEMENTATION_PACKAGE`,
+`IMPLEMENTATION_ALLOWED=true`, `V42_ASSET_CARD_AUTHORIZATION_STATUS=AUTHORIZED`,
+count 64, and `RESOLUTION_BLOCK_REASON=NONE` before editing.
+
+With the Owner's explicit re-review authorization and this current evidence,
+the original DataSource configuration test addition and Properties writer
+metadata patch were resubmitted and accepted. The original refusal text is
+preserved in the historical section below; no alternative path or gate change
+was used to bypass it. The renewed production/test authority remains limited
+to the existing 64 paths and source/local-disposable scope.
+
+Contract/data mapping: Appendix J.5/J.6 requires a separate card writer with
+exact snapshot SIU, bar/history SID and no other business-table rights. Default
+application/OHLCV reads remain unchanged. UI/algorithms are not modified.
+Real authentication, effective ACL, pool routing, failure/rotation and no-model
+SHADOW acceptance require actual disposable PostgreSQL, not mocked readiness.
+The native model probe remains independent and never connects to the database.
+
+Test-first evidence: the new V24 assertion that a migration administrator is
+not an application writer failed against the old implementation: **2 tests,
+1 expected failure, 0 errors, 0 skips**. Log:
+`/private/tmp/v42-writer-red-migration.log`. This is a recorded RED baseline,
+not a final verification result.
+
+The prior verified standard JAR is preserved at
+`/private/tmp/v42-writer-prior-native-evidence.rvABJ6/app.jar`, SHA-256
+`dd6cc81786fc5e0239325f0f9d35f4eab76362ea20148663b31222864836639b`.
+No dependency was reinstalled. That older native result is not proof of the
+new database wiring; the candidate standard-JAR checks are recorded separately.
+Actual systemd credential installation, real server/database permission
+changes, business merge and deployment remain NOT_EXECUTED/NO.
+
+### Dedicated connection and actual isolated PostgreSQL results
+
+- The Spring application context retains exactly one default DataSource and one
+  default JdbcTemplate. An independently named card DataSource/JdbcTemplate lives
+  under the card lifecycle holder, avoiding Boot auto-configuration backoff.
+  The production Mapper's constructor routes card tables only to that writer;
+  a random canonical OHLCV row is actually read using the unchanged read-only
+  default connection. Neither connection can read the other's unauthorized tables.
+- The dedicated Hikari pool uses generated temporary credentials and actual SCRAM
+  authentication, a two-connection default/1..4 bound, finite timeouts, lazy
+  initialization and bounded retry. Every borrow verifies current effective ACLs.
+  Missing/bad credentials, a killed connection plus NOLOGIN, and missing/excess
+  permissions refuse card writes; there are zero default-pool fallback writes.
+- Actual catalog tests enforce snapshot SELECT/INSERT/UPDATE, bar/history
+  SELECT/INSERT/DELETE, every required permission individually, forbidden table
+  and column rights, sequence access, grant options, PUBLIC grants, CREATE/TEMP,
+  ownership/membership and callable user-domain SECURITY DEFINER functions.
+  The temporary existing business row and old effective ACLs remain unchanged.
+  No production SQL/bootstrap/permission definition was weakened or changed.
+- A fresh candidate pool must authenticate and pass the same checks before swap.
+  A bad candidate preserves the old pool; an outstanding old lease remains usable
+  until returned, then that generation closes. Final close proves zero writer
+  sessions in PostgreSQL. Raw credential/driver failure details are not returned.
+- The credential tool now calls the actual independent Java verifier, with a new
+  JDBC connection each time. The real CLI tests cover bad password/database/owner,
+  excess permissions, preserved old files after rejected rotation, verified new
+  credentials and `RESTART_REQUIRED=YES`. Compiled-class mode is explicitly not
+  packaged-JAR evidence. The native model probe remains separate and never connects
+  to a database.
+- The actual Spring-configured dedicated writer starts no-model SHADOW, records
+  one INFERENCE through the production feature path, matures exactly one LONG and
+  one SHORT four-hour LABEL, and preserves identity across retry/restart. Actual
+  authentication, permissions and readiness are not mocked. Market observations
+  are isolated synthetic test fixtures only, not real training/calibration data.
+
+### Final source regression before clean candidate packaging
+
+- All 26 test classes in the effective V42 allowlist: **472 tests / 0 failures /
+  0 errors / 0 skips**, exit 0. Log `/private/tmp/v42-writer-all-focused.log`,
+  SHA-256 `f6ba27191367d2602c429ff6163b75b17ca0ce86a49347d1a5c1e8d0dcb38b59`.
+- Full Maven: **5,504 tests / 520 suites / 0 failures / 0 errors / 13 skips**,
+  exit 0. Java 17, fixed Python/XGBoost and local Docker API compatibility setting;
+  no Git-location override in tests. Log `/private/tmp/v42-writer-full-maven.log`,
+  SHA-256 `9046c3d256d002aa7dc37d8e5fc98cfd19361c65ade0bef0873d9acf28c11c54`.
+  All new real PostgreSQL cases executed. The unchanged 13 opt-in skips are listed
+  individually in the preserved table below; none was added or broadened.
+- Python **45 PASS / 0 skips**, both frontend event/timestamp matrices, JS/shell
+  syntax and diff checks PASS. Added-diff high-confidence secret-pattern matches: 0;
+  real credential tests separately assert their generated values never appear in
+  process output. This is not a claim to have read or scanned real credentials.
+- Product Source Gate, task validation, exact machine gates and workflow-contract
+  PASS, including **40 V42 outer cases / 0 failures**. No gate file changed.
+- Scope: **10 files changed in this continuation**, **60 full-branch changed paths**
+  versus effective main, all inside **64 unique paths**; no algorithm, canonical
+  decision, UI, external database, role installation or deployment modification.
+
+Ordinary test failures were corrected without weakening production checks: the
+fixture now uses PostgreSQL V1/V4 OHLCV DDL, a parameter-free dedicated JDBC URL
+(Testcontainers adds `loggerLevel` to its own URL), and the correct `acldefault('s')`
+sequence type. Source metadata was generated by the existing provenance profile,
+not hand-written. Review refused a proposed Maven `clean` invocation before it
+started; no clean/delete workaround ran. The reviewer-approved non-clean test
+command was used instead and prior build evidence was preserved.
+
+Clean candidate packaging, standard-JAR credential verification, Linux x86_64
+native rerun and final exact-head CI follow this source checkpoint. Until their
+individual results are recorded, local integration phase completion remains
+pending. Real training/calibration/test samples and Brier/ECE/LogLoss remain
+NOT_AVAILABLE; MODEL_MODE=SHADOW and PRODUCTION_MODEL_READY=NO.
+
 ## Native JAR continuation — partial local implementation, not runtime-ready (2026-09-11)
 
 The sections below this one are preserved historical evidence, not current allowlist or readiness.

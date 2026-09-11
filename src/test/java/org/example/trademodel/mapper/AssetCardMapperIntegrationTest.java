@@ -53,6 +53,36 @@ class AssetCardMapperIntegrationTest {
     }
 
     @Test
+    void disabledProductionWriterCannotFallBackToDefaultEvenWhenDefaultContainsWritableCardTables() throws Exception {
+        var properties = new org.example.trademodel.assetcard.AssetCardProperties();
+        try (var writer = new org.example.trademodel.assetcard.AssetCardDataSourceConfiguration.AssetCardWriter(properties)) {
+            var productionRoute = new AssetCardMapper(jdbc, writer);
+            String schema = Files.readString(Path.of("src/main/resources/schema.sql"));
+            int start = schema.indexOf("CREATE TABLE IF NOT EXISTS tm_persisted_ohlcv_bar (");
+            jdbc.execute(schema.substring(start, schema.indexOf(";", start) + 1));
+            insertHistory("BINANCE_PUBLIC", "SPOT", "OK", now, now, true);
+            assertThat(productionRoute.selectExistingSpotBars(symbol, "5m", now, 10)).hasSize(1);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> productionRoute.nextSnapshotVersion(symbol))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> productionRoute.saveFeatureHistory(symbol, now, now, "{}"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM tm_asset_card_snapshot", Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM tm_asset_card_feature_history", Integer.class)).isZero();
+            assertThat(productionRoute.inspectWriterPermissions().writable()).isFalse();
+            assertThat(productionRoute.inspectWriterPermissions().cleanupAllowed()).isFalse();
+        }
+    }
+
+    @Test
+    void springUsesOnlyExplicitDedicatedWriterConstructorNotTheIsolatedFixtureConstructor() throws Exception {
+        assertThat(AssetCardMapper.class.getConstructor(JdbcTemplate.class,
+                org.example.trademodel.assetcard.AssetCardDataSourceConfiguration.AssetCardWriter.class)
+                .isAnnotationPresent(org.springframework.beans.factory.annotation.Autowired.class)).isTrue();
+        assertThat(AssetCardMapper.class.getConstructor(JdbcTemplate.class)
+                .isAnnotationPresent(org.springframework.beans.factory.annotation.Autowired.class)).isFalse();
+    }
+
+    @Test
     void independentWritersMustNotOverwriteTheSameReadVersion() {
         var secondWriter = new AssetCardMapper(jdbc);
         long firstAllocated = mapper.nextSnapshotVersion(symbol);

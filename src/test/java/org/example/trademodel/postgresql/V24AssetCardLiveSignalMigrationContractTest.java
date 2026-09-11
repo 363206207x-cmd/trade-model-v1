@@ -91,7 +91,9 @@ class V24AssetCardLiveSignalMigrationContractTest {
                 assertThat(mapper.selectFeatureHistory(symbol, asOf, asOf, asOf, 10))
                         .extracting(org.example.trademodel.mapper.AssetCardMapper.FeatureHistory::payloadJson)
                         .containsExactly("{\"evidence\":1}");
-                assertThat(mapper.inspectWriterPermissions().writable()).isTrue();
+                // Migration's disposable administrator can validate SQL, but is never a least-privilege app writer.
+                assertThat(mapper.inspectWriterPermissions().writable()).isFalse();
+                assertThat(mapper.inspectWriterPermissions().cleanupAllowed()).isFalse();
                 assertThat(mapper.saveInference(symbol, asOf, asOf, "{\"status\":\"TIMEOUT\"}")).isEqualTo(1);
                 assertThat(mapper.saveInference(symbol, asOf.minusMillis(1), asOf.plusSeconds(1), "{\"status\":\"LATER\"}")).isZero();
                 assertThat(mapper.selectInference(symbol, asOf, asOf).orElseThrow().payloadJson())

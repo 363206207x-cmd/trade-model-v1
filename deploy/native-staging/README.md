@@ -127,10 +127,32 @@ AssetCardDataSourceConfiguration verify --jdbc-url <non-secret-url>
   --credential-owner <numeric-uid>
 ```
 
-Connection integration is currently **BLOCKED**: this stage has not supplied
-the dedicated DataSource verifier after its separate source changes were refused
-by review. A missing verifier fails closed before a credential rename. Fake-root
-CLI routing tests do not prove a fresh database connection or usable credentials.
+`AssetCardDataSourceConfiguration` now supplies that verifier and a private
+`assetCardDataSource` / `assetCardJdbcTemplate` pair. Only its lifecycle holder
+is registered in the application context, so Boot's default DataSource and
+JdbcTemplate auto-configuration remain intact. The Mapper uses the dedicated
+connection for the three card tables and the default connection only for existing
+OHLCV reads. Missing credentials, authentication/permission failure or an outage
+never route a card write to the default pool. Initialization is lazy, with bounded
+background retries; creating the application context does not connect the writer.
+
+The pool defaults to two connections (allowed range 1..4), with bounded connection,
+validation and statement timeouts. A fresh candidate must authenticate and pass
+the same effective-privilege checks before replacing the current generation.
+Failed candidates close; the old generation drains its existing leases before
+closing. Application shutdown closes both generations. This local lifecycle
+support is not a claim that systemd credentials hot-reload: the credential tool
+continues to output `RESTART_REQUIRED=YES` and does not restart anything.
+
+The credential CLI starts an independent non-Web Java main and performs read-only
+catalog checks over a new JDBC connection; it does not start Spring or the native
+model probe. A missing verifier still fails closed before a credential rename.
+`AssetCardDataSourceConfigurationTest` exercises real Spring/Hikari and disposable
+PostgreSQL. The infrastructure test's `assetCard.credential.integration-jar`
+option executes the actual candidate standard JAR entrypoint against that isolated
+database. Ordinary compiled-class/fake-root routing tests are not JAR acceptance;
+see the implementation evidence for separately recorded results. No test is a
+real systemd credential installation or Staging/database acceptance.
 
 ## Models and card drop-in
 

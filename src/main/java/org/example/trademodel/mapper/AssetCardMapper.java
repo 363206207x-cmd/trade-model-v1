@@ -3,6 +3,9 @@ package org.example.trademodel.mapper;
 import org.example.trademodel.assetcard.AssetCardMarketDataService.SpotBar;
 import org.example.trademodel.assetcard.AssetCardMarketDataService.SpotQuote;
 import org.example.trademodel.assetcard.AssetCardFeatureService;
+import org.example.trademodel.assetcard.AssetCardDataSourceConfiguration;
+import org.example.trademodel.assetcard.AssetCardDataSourceConfiguration.AssetCardWriter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -26,10 +29,24 @@ import java.util.HexFormat;
 @Repository
 public class AssetCardMapper {
     private final JdbcTemplate jdbc;
+    private final JdbcTemplate canonicalJdbc;
+    private final AssetCardWriter dedicatedWriter;
     private final boolean postgres;
 
+    /** Production only: canonical reads remain on Boot's unchanged default connection. No writer fallback. */
+    @Autowired
+    public AssetCardMapper(JdbcTemplate defaultJdbc, AssetCardWriter writer) {
+        canonicalJdbc = Objects.requireNonNull(defaultJdbc);
+        dedicatedWriter = Objects.requireNonNull(writer);
+        jdbc = writer.jdbcTemplate();
+        postgres = true;
+    }
+
+    /** Explicit isolated test fixture constructor, never selected by Spring. */
     public AssetCardMapper(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.canonicalJdbc = jdbc;
+        this.dedicatedWriter = null;
         try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
             String database = connection.getMetaData().getDatabaseProductName();
             if (!"PostgreSQL".equals(database) && !"H2".equals(database))
@@ -111,7 +128,7 @@ public class AssetCardMapper {
     public List<SpotBar> selectExistingSpotBars(String symbol, String interval, Instant asOf, int limit) {
         requireSymbol(symbol);
         LocalDateTime cutoff = LocalDateTime.ofInstant(asOf, ZoneOffset.UTC);
-        return jdbc.query("""
+        return canonicalJdbc.query("""
                 SELECT * FROM tm_persisted_ohlcv_bar WHERE symbol=? AND timeframe=?
                 AND provider='BINANCE_PUBLIC' AND provider_market_type='SPOT' AND is_closed=TRUE AND is_deleted=0
                 AND quality_status='OK' AND source_status='READY' AND source_version>0
@@ -267,21 +284,14 @@ public class AssetCardMapper {
     /** Read-only evidence, never a grant or role mutation; PostgreSQL enforces permissions again at each actual write. */
     public WriterReadiness inspectWriterPermissions() {
         if (!postgres) return new WriterReadiness(false, false, "H2_TEST_ONLY_NOT_PRODUCTION_WRITER");
+        if (dedicatedWriter != null) {
+            var result = dedicatedWriter.readiness();
+            // Exact SIU/SID/SID verification includes DELETE only on bars/history, never snapshots.
+            return new WriterReadiness(result.allowed(), result.allowed(), result.reason());
+        }
         try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
-            if (connection.isReadOnly()) return new WriterReadiness(false, false, "CARD_CONNECTION_READ_ONLY");
-            List<TablePermissions> permissions = jdbc.query("""
-                    SELECT COALESCE(to_regclass(table_name)=to_regclass('public.' || table_name),FALSE) AS exact_table,
-                        current_setting('transaction_read_only')='off' AS transaction_writable,
-                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'SELECT'),FALSE) AS can_select,
-                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'INSERT'),FALSE) AS can_insert,
-                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'UPDATE'),FALSE) AS can_update,
-                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'DELETE'),FALSE) AS can_delete
-                    FROM (VALUES ('tm_asset_card_snapshot'),('tm_asset_card_spot_bar'),('tm_asset_card_feature_history')) AS card_tables(table_name)
-                    """, (rs, row) -> new TablePermissions(rs.getBoolean("exact_table") && rs.getBoolean("transaction_writable")
-                    && rs.getBoolean("can_select") && rs.getBoolean("can_insert") && rs.getBoolean("can_update"), rs.getBoolean("can_delete")));
-            boolean writable = permissions.size() == 3 && permissions.stream().allMatch(TablePermissions::writable);
-            return new WriterReadiness(writable, writable && permissions.stream().allMatch(TablePermissions::canDelete),
-                    writable ? "CARD_TABLE_WRITE_PERMISSIONS_VERIFIED" : "CARD_TABLE_MISSING_OR_WRITE_DENIED");
+            var result = AssetCardDataSourceConfiguration.verify(connection, connection.getCatalog());
+            return new WriterReadiness(result.allowed(), result.allowed(), result.reason());
         } catch (RuntimeException | SQLException failure) {
             return new WriterReadiness(false, false, "CARD_PERMISSION_CHECK_FAILED");
         }
@@ -330,7 +340,6 @@ public class AssetCardMapper {
     public record TypedHistory(String symbol, HistoryKind recordKind, String recordKey, Instant signalAsOf,
                                Instant availableAt, String payloadJson) {}
     public record WriterReadiness(boolean writable, boolean cleanupAllowed, String reason) {}
-    private record TablePermissions(boolean writable, boolean canDelete) {}
     public record ArchiveConfirmation(String symbol, HistoryKind recordKind, List<String> recordKeys, Instant fromInclusive,
                                       Instant toExclusive, Instant availableAtCutoff, String manifestSha256, Instant archivedAt) {
         public ArchiveConfirmation {

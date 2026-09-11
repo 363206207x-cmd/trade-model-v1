@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @Tag("core-regression")
 class NativeStagingAssetCardInfrastructureContractTest {
     private static final Path SOURCE = Path.of("deploy/native-staging").toAbsolutePath();
+    private static final String WRITER_MAIN="org.example.trademodel.assetcard.AssetCardDataSourceConfiguration";
     @TempDir Path temporary;
     record Result(int code, String output) {}
     record Fixture(Path root, Path manifest) {}
@@ -122,6 +123,95 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(denied.output()).doesNotContain("SYNTHETIC_NEW_PASSWORD", "SYNTHETIC_PASSWORD_SENTINEL");
         try (var paths=Files.walk(fixture.root())) {
             assertThat(paths.filter(p->p.getFileName().toString().contains("pending-credential")).toList()).isEmpty();
+        }
+    }
+
+    @Test void realCredentialCliAuthenticatesFreshConnectionsAndFailedRotationPreservesTheWorkingCredential() throws Exception {
+        boolean docker;
+        try { docker= DockerClientFactory.instance().isDockerAvailable(); } catch (RuntimeException unavailable) { docker=false; }
+        assumeTrue(docker,"Disposable PostgreSQL unavailable; real credential integration not executed and no external fallback");
+        try(var database=new PostgreSQLContainer<>("postgres:16-alpine")
+                .withEnv("POSTGRES_HOST_AUTH_METHOD","scram-sha-256")
+                .withCommand("postgres","-c","password_encryption=scram-sha-256")) {
+            database.start();
+            for(String file:List.of("asset-card-role-bootstrap.sql","asset-card-role-verify.sql"))
+                database.copyFileToContainer(MountableFile.forHostPath(SOURCE.resolve(file)),"/tmp/"+file);
+            database.copyFileToContainer(MountableFile.forHostPath(Path.of("src/main/resources/db/migration/V24__asset_card_live_signal.sql")),"/tmp/actual-v24.sql");
+            assertThat(file(database,"actual-v24.sql").getExitCode()).isZero();
+            assertThat(sql(database,"REVOKE TEMP ON DATABASE test FROM PUBLIC; CREATE TABLE public.existing_private_business(id int);"
+                    +"INSERT INTO public.existing_private_business VALUES (42); CREATE SEQUENCE public.existing_private_sequence;").getExitCode()).isZero();
+            assertThat(file(database,"asset-card-role-bootstrap.sql").getExitCode()).isZero();
+            String oldPassword="LOCAL_ONLY_OLD_"+java.util.UUID.randomUUID();
+            String badPassword="LOCAL_ONLY_BAD_"+java.util.UUID.randomUUID();
+            String newPassword="LOCAL_ONLY_NEW_"+java.util.UUID.randomUUID();
+            setDisposableWriterPassword(database,oldPassword);
+            String databaseBaseline=sql(database,"SELECT oid,relacl::text FROM pg_class WHERE relname IN ('existing_private_business','existing_private_sequence') ORDER BY oid").getStdout();
+            Fixture fixture=realCredentialFixture(database);
+            Path current=fixture.root().resolve("etc/rine-logic/credentials/asset-card-db-password");
+            write(current,oldPassword,"rw-------");
+            Result initial=realCredentialCli(fixture,current,"test",Files.getAttribute(current,"unix:uid").toString());
+            assertSafeCredentialOutput(initial,oldPassword,badPassword,newPassword);
+            assertThat(initial.code()).isZero();
+            assertThat(initial.output()).contains("ASSET_CARD_WRITER_VERIFY=PASS");
+
+            // A new process has no old connection pool: the wrong password must fail real SCRAM authentication.
+            Path candidate=current.getParent().resolve("candidate-password");
+            write(candidate,badPassword,"rw-------");
+            Result badAuth=realCredentialCli(fixture,candidate,"test",Files.getAttribute(candidate,"unix:uid").toString());
+            assertSafeCredentialOutput(badAuth,oldPassword,badPassword,newPassword);
+            assertThat(badAuth.code()).isNotZero();
+            assertThat(badAuth.output()).contains("ASSET_CARD_WRITER_VERIFY=FAIL");
+            Result failedRotation=run("asset-card-runtime-credentials.sh",fixture,"--rotate","--candidate",candidate.toString(),
+                    "--confirm","PREPARE_OR_ROTATE_ASSET_CARD_CREDENTIAL_ONLY");
+            assertSafeCredentialOutput(failedRotation,oldPassword,badPassword,newPassword);
+            assertThat(failedRotation.code()).isNotZero();
+            assertThat(failedRotation.output()).contains("FRESH_CREDENTIAL_VERIFICATION_FAILED").doesNotContain("FRESH_CONNECTION=PASS");
+            assertThat(Files.readString(current).equals(oldPassword)).as("Failed authentication preserves the old credential bytes").isTrue();
+            assertThat(realCredentialCli(fixture,current,"test",Files.getAttribute(current,"unix:uid").toString()).code()).isZero();
+            try(var paths=Files.list(current.getParent())) {
+                assertThat(paths.filter(p->p.getFileName().toString().contains(".previous.")).toList()).isEmpty();
+            }
+
+            Result badDatabase=realCredentialCli(fixture,current,"wrong_expected_database",Files.getAttribute(current,"unix:uid").toString());
+            assertSafeCredentialOutput(badDatabase,oldPassword,badPassword,newPassword);
+            assertThat(badDatabase.code()).isNotZero();
+            Result badOwner=realCredentialCli(fixture,current,"test",Long.toString(((Number)Files.getAttribute(current,"unix:uid")).longValue()+1));
+            assertSafeCredentialOutput(badOwner,oldPassword,badPassword,newPassword);
+            assertThat(badOwner.code()).isNotZero();
+
+            // Authentication succeeds but an extra card-table privilege must still reject rotation.
+            write(candidate,oldPassword,"rw-------");
+            assertThat(sql(database,"GRANT DELETE ON public.tm_asset_card_snapshot TO rine_asset_card_writer").getExitCode()).isZero();
+            Result badAcl=run("asset-card-runtime-credentials.sh",fixture,"--rotate","--candidate",candidate.toString(),
+                    "--confirm","PREPARE_OR_ROTATE_ASSET_CARD_CREDENTIAL_ONLY");
+            assertSafeCredentialOutput(badAcl,oldPassword,badPassword,newPassword);
+            assertThat(badAcl.code()).isNotZero();
+            assertThat(badAcl.output()).contains("FRESH_CREDENTIAL_VERIFICATION_FAILED");
+            assertThat(Files.readString(current).equals(oldPassword)).as("Failed ACL verification preserves the old credential bytes").isTrue();
+            assertThat(sql(database,"REVOKE DELETE ON public.tm_asset_card_snapshot FROM rine_asset_card_writer").getExitCode()).isZero();
+            assertThat(realCredentialCli(fixture,current,"test",Files.getAttribute(current,"unix:uid").toString()).code()).isZero();
+
+            // Only this disposable database's admin provisions the new password; the installer never changes roles.
+            setDisposableWriterPassword(database,newPassword);
+            write(candidate,newPassword,"rw-------");
+            Result changed=run("asset-card-runtime-credentials.sh",fixture,"--rotate","--candidate",candidate.toString(),
+                    "--confirm","PREPARE_OR_ROTATE_ASSET_CARD_CREDENTIAL_ONLY");
+            assertSafeCredentialOutput(changed,oldPassword,badPassword,newPassword);
+            assertThat(changed.code()).isZero();
+            assertThat(changed.output()).contains("FRESH_CONNECTION=PASS","RESTART_REQUIRED=YES","HOT_ROTATION=NOT_CLAIMED","SYSTEMD_CHANGE_EXECUTION=NO");
+            assertThat(Files.readString(current).equals(newPassword)).as("Successful verified rotation installs the new credential bytes").isTrue();
+            assertThat(candidate).doesNotExist();
+            assertThat(realCredentialCli(fixture,current,"test",Files.getAttribute(current,"unix:uid").toString()).code()).isZero();
+            try(var paths=Files.list(current.getParent())) {
+                List<Path> backups=paths.filter(p->p.getFileName().toString().contains(".previous.")).toList();
+                assertThat(backups).hasSize(1);
+                assertThat(Files.readString(backups.get(0)).equals(oldPassword)).as("Protected rollback inode retains the prior credential bytes").isTrue();
+                assertThat(Files.getPosixFilePermissions(backups.get(0))).isEqualTo(PosixFilePermissions.fromString("rw-------"));
+            }
+            assertThat(sql(database,"SELECT oid,relacl::text FROM pg_class WHERE relname IN ('existing_private_business','existing_private_sequence') ORDER BY oid").getStdout()).isEqualTo(databaseBaseline);
+            assertThat(sql(database,"SELECT id FROM public.existing_private_business").getStdout()).isEqualTo("42\n");
+            assertThat(sql(database,"SELECT (SELECT count(*) FROM public.tm_asset_card_snapshot)+(SELECT count(*) FROM public.tm_asset_card_spot_bar)+(SELECT count(*) FROM public.tm_asset_card_feature_history)").getStdout()).isEqualTo("0\n");
+            assertThat(file(database,"asset-card-role-verify.sql").getExitCode()).isZero();
         }
     }
 
@@ -261,6 +351,91 @@ class NativeStagingAssetCardInfrastructureContractTest {
     private static org.testcontainers.containers.Container.ExecResult sql(PostgreSQLContainer<?> db,String sql) throws Exception {
         return db.execInContainer("psql","-X","-v","ON_ERROR_STOP=1","-U",db.getUsername(),"-d",db.getDatabaseName(),"-Atc",sql);
     }
+    private static void setDisposableWriterPassword(PostgreSQLContainer<?> database,String password) throws Exception {
+        // Generated local-only credential: never put it in a command argument, log or environment variable.
+        try(var connection=java.sql.DriverManager.getConnection(database.getJdbcUrl(),database.getUsername(),database.getPassword());
+            var statement=connection.createStatement()) {
+            statement.execute("ALTER ROLE rine_asset_card_writer PASSWORD '"+password.replace("'","''")+"'");
+        }
+    }
+    private Fixture realCredentialFixture(PostgreSQLContainer<?> database) throws Exception {
+        Fixture fixture=fixture();
+        String jdbcUrl="jdbc:postgresql://"+database.getHost()+":"+database.getMappedPort(5432)+"/"+database.getDatabaseName();
+        Path jar=fixture.root().resolve("opt/rine-logic/current/app.jar");
+        String suppliedJar=System.getProperty("assetCard.credential.integration-jar");
+        Path actualJava=Path.of(System.getProperty("java.home"),"bin","java").toRealPath();
+        String wrapper;
+        if(suppliedJar!=null) {
+            Path sourceJar=Path.of(suppliedJar).toAbsolutePath().normalize();
+            assertThat(sourceJar).isRegularFile();
+            assertThat(Files.isSymbolicLink(sourceJar)).isFalse();
+            verifyCredentialJarIdentity(sourceJar);
+            Files.copy(sourceJar,jar,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.setPosixFilePermissions(jar,PosixFilePermissions.fromString("rw-r--r--"));
+            wrapper="#!/bin/sh\nexec "+shellQuote(actualJava.toString())+" \"$@\"\n";
+            System.out.println("ASSET_CARD_CREDENTIAL_RUNTIME_MODE=STANDARD_JAR\nASSET_CARD_CREDENTIAL_JAR_SHA256="+sha(jar));
+        } else {
+            String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
+            assertThat(Thread.currentThread().getContextClassLoader().getResource(WRITER_MAIN.replace('.','/')+".class")).isNotNull();
+            // The ordinary test lifecycle precedes repackage. This adapter changes only the launcher,
+            // then executes the current production CLI in a real child JVM; no auth or output is stubbed.
+            wrapper="#!/bin/sh\n[ \"$1\" = '-Dloader.main="+WRITER_MAIN+"' ] && [ \"$2\" = '-cp' ] && "
+                    +"[ \"$4\" = 'org.springframework.boot.loader.launch.PropertiesLauncher' ] || exit 64\nshift 4\nexec "
+                    +shellQuote(actualJava.toString())+" -cp "+shellQuote(classpath)+" "+WRITER_MAIN+" \"$@\"\n";
+            System.out.println("ASSET_CARD_CREDENTIAL_RUNTIME_MODE=COMPILED_CLASSES_NOT_JAR_EVIDENCE");
+        }
+        write(fixture.root().resolve("usr/bin/java"),wrapper,"rwx------");
+        String manifest=Files.readString(fixture.manifest()).replace("WRITER_JDBC_URL=jdbc:postgresql://127.0.0.1:1/test","WRITER_JDBC_URL="+jdbcUrl)
+                .replaceAll("(?m)^APP_JAR_SHA256=.*$","APP_JAR_SHA256="+sha(jar));
+        Files.writeString(fixture.manifest(),manifest);
+        return fixture;
+    }
+    private static void verifyCredentialJarIdentity(Path jar) throws Exception {
+        try(var archive=new java.util.jar.JarFile(jar.toFile())) {
+            assertThat(archive.getJarEntry("org/springframework/boot/loader/launch/PropertiesLauncher.class")).isNotNull();
+            String classResource=WRITER_MAIN.replace('.','/')+".class";
+            var entry=archive.getJarEntry("BOOT-INF/classes/"+classResource);
+            assertThat(entry).isNotNull();
+            try(var fromJar=archive.getInputStream(entry);var compiled=Thread.currentThread().getContextClassLoader().getResourceAsStream(classResource)) {
+                assertThat(compiled).isNotNull();
+                assertThat(fromJar.readAllBytes()).as("Standard JAR must contain the current compiled writer CLI, not a stale artifact").isEqualTo(compiled.readAllBytes());
+            }
+            for(var entries=archive.entries();entries.hasMoreElements();) {
+                var nested=entries.nextElement();
+                if(!nested.getName().startsWith("BOOT-INF/classes/"+classResource.replace(".class","$")) || !nested.getName().endsWith(".class")) continue;
+                String resource=nested.getName().substring("BOOT-INF/classes/".length());
+                try(var fromJar=archive.getInputStream(nested);var compiled=Thread.currentThread().getContextClassLoader().getResourceAsStream(resource)) {
+                    assertThat(compiled).isNotNull();
+                    assertThat(fromJar.readAllBytes()).as("Nested writer implementation must match the current compiled candidate").isEqualTo(compiled.readAllBytes());
+                }
+            }
+            var metadata=archive.getJarEntry("BOOT-INF/classes/git.properties");
+            assertThat(metadata).isNotNull();
+            var identity=new java.util.Properties();
+            try(var input=archive.getInputStream(metadata)) { identity.load(input); }
+            var git=new ProcessBuilder("git","rev-parse","HEAD").directory(Path.of(".").toRealPath().toFile());
+            git.environment().remove("GIT_DIR"); git.environment().remove("GIT_WORK_TREE");
+            var process=git.start();
+            assertThat(process.waitFor(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(process.exitValue()).isZero();
+            String head=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).trim();
+            assertThat(identity.getProperty("git.commit.id.full")).isEqualTo(head);
+            assertThat(identity.getProperty("git.dirty")).isEqualTo("false");
+        }
+    }
+    private Result realCredentialCli(Fixture fixture,Path credential,String expectedDatabase,String expectedOwner) throws Exception {
+        String jdbcUrl=Files.readAllLines(fixture.manifest()).stream().filter(line->line.startsWith("WRITER_JDBC_URL=")).findFirst().orElseThrow().substring("WRITER_JDBC_URL=".length());
+        var process=new ProcessBuilder(fixture.root().resolve("usr/bin/java").toString(),"-Dloader.main="+WRITER_MAIN,"-cp",
+                fixture.root().resolve("opt/rine-logic/current/app.jar").toString(),"org.springframework.boot.loader.launch.PropertiesLauncher",
+                "verify","--jdbc-url",jdbcUrl,"--expected-database",expectedDatabase,"--credential-file",credential.toString(),"--credential-owner",expectedOwner)
+                .redirectErrorStream(true).start();
+        return awaitLocalProcess(process);
+    }
+    private static void assertSafeCredentialOutput(Result result,String... passwords) {
+        assertThat(java.util.Arrays.stream(passwords).noneMatch(result.output()::contains)).as("Credential output must not expose local-only password values").isTrue();
+        assertThat(result.output()).doesNotContain("Exception", "org.postgresql", "jdbc:postgresql:", "Started TradeModel");
+    }
+    private static String shellQuote(String value) { return "'"+value.replace("'","'\\''")+"'"; }
     private Fixture fixture() throws Exception {
         Path root=Files.createTempDirectory(temporary,"native-fake-").toRealPath();
         Files.setPosixFilePermissions(root,PosixFilePermissions.fromString("rwx------"));
@@ -294,8 +469,24 @@ class NativeStagingAssetCardInfrastructureContractTest {
     private Result run(String script,Fixture fixture,String... extra) throws Exception {
         var command=new java.util.ArrayList<>(List.of("bash",SOURCE.resolve(script).toString(),"--manifest",fixture.manifest().toString(),"--test-root",fixture.root().toString()));
         command.addAll(List.of(extra)); var process=new ProcessBuilder(command).redirectErrorStream(true).start();
-        assertThat(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-        return new Result(process.exitValue(),new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
+        return awaitLocalProcess(process);
+    }
+    private static Result awaitLocalProcess(Process process) throws Exception {
+        try {
+            assertThat(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            return new Result(process.exitValue(),new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
+        } finally {
+            if(process.isAlive()) {
+                // The rotation shell may still be waiting for its fresh-connection JVM.
+                // Terminate that child too; a timeout remains a failed test, never a skipped check.
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+                process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS);
+            }
+            process.getOutputStream().close();
+            process.getInputStream().close();
+            process.getErrorStream().close();
+        }
     }
     private static void write(Path path,String value,String mode) throws Exception {
         Files.createDirectories(path.getParent()); Files.writeString(path,value); Files.setPosixFilePermissions(path,PosixFilePermissions.fromString(mode));
