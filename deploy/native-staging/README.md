@@ -69,6 +69,13 @@ All shell entrypoints default to CHECK_ONLY or DRY_RUN and share:
 bash <entrypoint> --manifest /reviewed/non-secret/runtime.manifest
 ```
 
+Both PREPARED and ARMED require the two storage leaves and their trusted parent
+to have been provisioned under separate installation authority before preflight
+or drop-in installation. The mandatory ReadWritePaths are never silently ignored.
+Missing, symlinked or incorrectly owned/mode/group paths reject before replacing
+any existing drop-in. PREPARED keeps all card switches off and does not require
+or claim the ARMED-only quota, window or database-device proof.
+
 `asset-card-runtime-preflight.sh` checks file/owner/permission/base SHA identity,
 credential metadata only, Linux x86_64, Java 17 and libgomp availability. A
 present immutable model pointer also receives checksum-only verification.

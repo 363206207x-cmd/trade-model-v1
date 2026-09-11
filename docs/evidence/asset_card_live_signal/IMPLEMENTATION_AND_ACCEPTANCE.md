@@ -1,5 +1,35 @@
 # Asset-card live signal implementation evidence
 
+## PREPARED storage review correction — 2026-09-12
+
+The exact a0f61b92 review found V42-RUNTIME-001: mandatory ReadWritePaths were
+rendered in PREPARED while directory validation returned early unless ARMED.
+Two new isolated regressions reproduced the false PASS for missing/unsafe
+leaves. The correction checks existence, service UID/GID, 0700 mode, trusted
+root0755 parent and absence of symlinks in both modes before writing a drop-in.
+Only ARMED performs the database-device declaration check. No optional-path
+prefix, directory auto-creation, quota default or permission relaxation was
+introduced. Tests preserve an existing drop-in on refusal and keep PREPARED
+independent of unapproved collection clocks/quotas. Final new-Head results are
+recorded on #1300; prior a0f61b92 results below are historical, not new-Head CI.
+
+Separately, the Owner-authorized Staging storage directories were created:
+root:root0755 parent and UID999/GID9880700 collection/archive leaves on device
+64770, matching PGDATA. The unique offline systemd probe
+`v42-storage-preflight-a0f61b92-20260911T190430Z.service` used the actual service
+identity and matched sandbox constraints; both leaves passed write/read/removal
+of only fresh probe files, the parent was not writable, exit0. This did not
+restart the application or claim the new application's writer was activated.
+The old storage metadata and running PID658723 were unchanged.
+
+The existing Chrome Dashboard was rechecked without clearing any site data.
+Its stale visible page redirected to `/login`, matching zero active authenticated
+database Sessions. Owner-only preview binding is therefore not yet established.
+Recent bounded application logs contained no numeric quota facts. Shared-IP
+headroom/account limits remain unproven; C1/C2 are unstarted, not filled with
+guessed values. The old service remains active at 8d77902; no new deployment,
+credential change, migration, model training or Owner-position operation occurred.
+
 ## V42 reviewed continuation and dedicated storage wiring — 2026-09-12
 
 PR #1301 was re-reviewed without changing source Head

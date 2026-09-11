@@ -176,14 +176,19 @@ native_service_directory() {
   [[ "$(native_gid "$parent")" = "$parent_group" && "$(native_mode "$parent")" = 755 ]] || native_fail COLLECTION_PARENT_UNSAFE
 }
 native_collection_storage_checks() {
-  [[ "$CARD_STARTUP_MODE" = ARMED ]] || return 0
   local directory device
+  # PREPARED also installs mandatory ReadWritePaths. Check their existence and
+  # trust before any drop-in write; only the collection device proof needs ARMED.
   for directory in "$COLLECTION_STATE_DIRECTORY" "$ARCHIVE_DIRECTORY"; do
     directory=$(native_path "$directory"); native_service_directory "$directory"
-    device=$(stat -c '%d' "$directory" 2>/dev/null) || device=$(stat -f '%d' "$directory")
-    [[ "$device" = "$DATABASE_FILESYSTEM_DEVICE" ]] || native_fail DATABASE_FILESYSTEM_DECLARATION_MISMATCH
+    if [[ "$CARD_STARTUP_MODE" = ARMED ]]; then
+      device=$(stat -c '%d' "$directory" 2>/dev/null) || device=$(stat -f '%d' "$directory")
+      [[ "$device" = "$DATABASE_FILESYSTEM_DEVICE" ]] || native_fail DATABASE_FILESYSTEM_DECLARATION_MISMATCH
+    fi
   done
-  printf 'DATABASE_FILESYSTEM_EVIDENCE=REVIEWED_DECLARATION_ONLY\nVISIBLE_COLLECTION_DIRECTORIES_DEVICE_MATCH=YES\n'
+  if [[ "$CARD_STARTUP_MODE" = ARMED ]]; then
+    printf 'DATABASE_FILESYSTEM_EVIDENCE=REVIEWED_DECLARATION_ONLY\nVISIBLE_COLLECTION_DIRECTORIES_DEVICE_MATCH=YES\n'
+  fi
 }
 native_collection_environment() {
   [[ "$CARD_STARTUP_MODE" = ARMED ]] || return 0

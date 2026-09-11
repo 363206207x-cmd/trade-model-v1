@@ -339,6 +339,44 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(applied.output()).contains("CARD_STARTUP_MODE=PREPARED", "RESTART_REQUIRED=YES", "SYSTEMD_CHANGE_EXECUTION=NO");
     }
 
+    @Test void preparedAttachmentRequiresBothStorageLeavesBeforeWritingAnyDropin() throws Exception {
+        for(String missing:List.of("collection","archive")) {
+            Fixture fixture=fixture();
+            Path leaf=fixture.root().resolve("var/lib/rine-logic-asset-card/"+missing);
+            Files.move(leaf,leaf.resolveSibling("retained-"+missing));
+            Result dryRun=run("asset-card-runtime-install.sh",fixture);
+            assertThat(dryRun.code()).as("PREPARED must reject missing %s",missing).isNotZero();
+            assertThat(dryRun.output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+            assertThat(cardDropin(fixture)).doesNotExist();
+            write(cardDropin(fixture),"SYNTHETIC_PREVIOUS_CARD_DROPIN","rw-r--r--");
+            Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY");
+            assertThat(applied.code()).isNotZero();
+            assertThat(applied.output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+            assertThat(Files.readString(cardDropin(fixture))).isEqualTo("SYNTHETIC_PREVIOUS_CARD_DROPIN");
+            try(var paths=Files.list(cardDropin(fixture).getParent())) {
+                assertThat(paths.map(path->path.getFileName().toString()).filter(name->name.startsWith("40-asset-card.conf.")).toList()).isEmpty();
+            }
+        }
+    }
+
+    @Test void preparedAttachmentRejectsUnsafeStorageWithoutRequiringAnArmedWindow() throws Exception {
+        Fixture wrongMode=fixture();
+        Files.setPosixFilePermissions(wrongMode.root().resolve("var/lib/rine-logic-asset-card/archive"),PosixFilePermissions.fromString("rwxrwxrwx"));
+        assertThat(run("asset-card-runtime-install.sh",wrongMode).output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+        assertThat(cardDropin(wrongMode)).doesNotExist();
+        Fixture wrongGroup=fixture();
+        replaceManifestValue(wrongGroup,"SERVICE_GID",String.valueOf(Integer.parseInt(manifestValue(wrongGroup,"SERVICE_GID"))+1));
+        assertThat(run("asset-card-runtime-install.sh",wrongGroup).output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+        assertThat(cardDropin(wrongGroup)).doesNotExist();
+        Fixture valid=fixture();
+        assertThat(manifestValue(valid,"SHARED_IP_WEIGHT_LIMIT_PER_MINUTE")).isEqualTo("0");
+        assertThat(manifestValue(valid,"COLLECTION_STARTS_AT")).isEqualTo("NOT_CONFIGURED");
+        Result checked=run("asset-card-runtime-install.sh",valid);
+        assertThat(checked.code()).withFailMessage(checked.output()).isZero();
+        assertThat(checked.output()).doesNotContain("VISIBLE_COLLECTION_DIRECTORIES_DEVICE_MATCH=YES");
+        assertThat(cardDropin(valid)).doesNotExist();
+    }
+
     @Test void ownerPreviewAttachmentIsExplicitSingleAccountAndNeverChangesModelOrWindowEligibility() throws Exception {
         Fixture fixture=fixture();
         String original=Files.readString(fixture.manifest());
@@ -701,6 +739,11 @@ class NativeStagingAssetCardInfrastructureContractTest {
         write(root.resolve("etc/rine-logic/credentials/asset-card-db-password"),"SYNTHETIC_PASSWORD_SENTINEL","rw-------");
         write(root.resolve("usr/bin/java"),"#!/bin/sh\nprintf '%s\\n' ASSET_CARD_WRITER_VERIFY=FAIL VERIFIED_BUNDLE_STATUS=FAIL\nexit 2\n","rwx------");
         Files.createDirectories(root.resolve("opt/rine-logic/models/asset-card"));
+        for(String leaf:List.of("collection","archive")) {
+            Path path=root.resolve("var/lib/rine-logic-asset-card/"+leaf);
+            Files.createDirectories(path); Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(path.getParent(),PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
         String template=Files.readString(SOURCE.resolve("asset-card-runtime-manifest.template"));
         String uid=Files.getAttribute(root,"unix:uid").toString();
         template=template.replace("NATIVE_SYSTEMD_JAR_RUNTIME","TEST_FIXTURE_ONLY")
@@ -727,11 +770,6 @@ class NativeStagingAssetCardInfrastructureContractTest {
         replaceManifestValue(fixture,"SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE","500");
         replaceManifestValue(fixture,"SHARED_IP_WEIGHT_LIMIT_PER_MINUTE","6000");
         replaceManifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT",confirmed.toString());
-        for(String leaf:List.of("collection","archive")) {
-            Path path=fixture.root().resolve("var/lib/rine-logic-asset-card/"+leaf);
-            Files.createDirectories(path); Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rwx------"));
-            Files.setPosixFilePermissions(path.getParent(),PosixFilePermissions.fromString("rwxr-xr-x"));
-        }
         replaceManifestValue(fixture,"STORAGE_SAME_FILESYSTEM_VERIFIED","YES");
         replaceManifestValue(fixture,"DATABASE_FILESYSTEM_DEVICE",Files.getAttribute(fixture.root(),"unix:dev").toString());
         return fixture;
