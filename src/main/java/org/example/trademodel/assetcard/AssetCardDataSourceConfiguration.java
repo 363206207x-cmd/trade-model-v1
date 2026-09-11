@@ -23,11 +23,70 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /** Card-only holder: deliberately NOT a root DataSource/JdbcOperations bean. */
 @Configuration(proxyBeanMethods = false)
 public class AssetCardDataSourceConfiguration {
     public static final String WRITER_ROLE = "rine_asset_card_writer";
+    private static final String SYSTEMD_CREDENTIAL_DIRECTORY = "/run/credentials/rine-logic.service";
+    private static final String SYSTEMD_CREDENTIAL_PATH = "/run/credentials/rine-logic.service/asset-card-db-password";
+
+    /* Linux systemd credentials use a root-owned read-only tmpfs and an exact named-user ACL.
+       This helper reads metadata only, never the credential bytes. Missing prerequisites fail closed. */
+    static final String SYSTEMD_CREDENTIAL_METADATA_CHECK = """
+        import errno,os,stat,struct,sys
+        def check():
+            if len(sys.argv)!=3 or sys.platform!='linux': return False
+            text,path=sys.argv[1:]
+            if not text.isascii() or not text.isdecimal() or len(text)>10: return False
+            uid=int(text)
+            directory='/run/credentials/rine-logic.service'
+            if uid<=0 or uid>2147483647 or os.getuid()!=uid or os.geteuid()!=uid: return False
+            if path!=directory+'/asset-card-db-password' or os.environ.get('CREDENTIALS_DIRECTORY')!=directory: return False
+            for ancestor in ('/','/run','/run/credentials',directory):
+                info=os.lstat(ancestor)
+                if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_gid!=0 or info.st_mode&0o022: return False
+            d=os.lstat(directory); f=os.lstat(path)
+            if stat.S_IMODE(d.st_mode)!=0o550 or stat.S_IMODE(f.st_mode)!=0o440: return False
+            if not stat.S_ISREG(f.st_mode) or f.st_uid!=0 or f.st_gid!=0 or not 1<=f.st_size<=4096: return False
+            def acl(target,permission):
+                value=os.getxattr(target,'system.posix_acl_access',follow_symlinks=False)
+                if len(value)!=44 or struct.unpack_from('<I',value)[0]!=2: return False
+                actual=[struct.unpack_from('<HHI',value,offset) for offset in range(4,len(value),8)]
+                expected=[(1,permission,0xffffffff),(2,permission,uid),(4,0,0xffffffff),(16,permission,0xffffffff),(32,0,0xffffffff)]
+                return actual==expected
+            if not acl(directory,5) or not acl(path,4): return False
+            try:
+                os.getxattr(directory,'system.posix_acl_default',follow_symlinks=False)
+                return False
+            except OSError as missing:
+                if missing.errno!=errno.ENODATA: return False
+            with open('/proc/self/mountinfo','rb') as stream: data=stream.read(1048577)
+            if not data or len(data)>1048576: return False
+            def decode_mount(value):
+                for escaped,literal in (('\\\\040',' '),('\\\\011','\\t'),('\\\\012','\\n'),('\\\\134','\\\\')):
+                    value=value.replace(escaped,literal)
+                return value
+            covering=[]
+            for line in data.decode('ascii').splitlines():
+                left,right=line.split(' - ',1); fields=left.split(); filesystem=right.split()
+                mount=decode_mount(fields[4]); options=set(fields[5].split(','))
+                if path==mount or path.startswith(mount.rstrip('/')+'/'):
+                    covering.append((len(mount),mount,options,filesystem[0]))
+            if not covering: return False
+            longest=max(entry[0] for entry in covering)
+            matches=[entry for entry in covering if entry[0]==longest]
+            if len(matches)!=1: return False
+            _,mount,options,kind=matches[0]
+            if mount!=directory or kind!='tmpfs' or 'rw' in options: return False
+            if not {'ro','nosuid','nodev','noexec','nosymfollow'}.issubset(options): return False
+            return bool(os.statvfs(path).f_flag&os.ST_RDONLY)
+        try: allowed=check()
+        except BaseException: allowed=False
+        print('ASSET_CARD_SYSTEMD_CREDENTIAL_METADATA='+('PASS' if allowed else 'FAIL'))
+        sys.exit(0 if allowed else 2)
+        """;
 
     @Bean(name = "assetCardWriter", destroyMethod = "close")
     public AssetCardWriter assetCardWriter(AssetCardProperties properties) { return new AssetCardWriter(properties); }
@@ -115,6 +174,8 @@ public class AssetCardDataSourceConfiguration {
         try {
             if (path == null || !path.isAbsolute() || !path.normalize().equals(path) || expectedOwner == null || expectedOwner.isBlank())
                 throw new IllegalArgumentException();
+            boolean systemdRuntime = SYSTEMD_CREDENTIAL_PATH.equals(path.toString());
+            byte[] mountBefore = systemdRuntime ? systemdMountIdentity() : null;
             Path cursor = path.getRoot();
             for (Path component : path) {
                 cursor = cursor.resolve(component);
@@ -130,16 +191,18 @@ public class AssetCardDataSourceConfiguration {
                         throw new IllegalArgumentException();
                 }
             }
-            PosixFileAttributes before = credentialAttributes(path, expectedOwner);
+            PosixFileAttributes before = credentialAttributes(path, expectedOwner, systemdRuntime);
             try (var channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
                 ByteBuffer buffer = ByteBuffer.allocate(4097);
                 while (buffer.hasRemaining() && channel.read(buffer) > 0) { }
                 if (buffer.position() < 1 || buffer.position() > 4096) throw new IllegalArgumentException();
                 bytes = Arrays.copyOf(buffer.array(), buffer.position()); Arrays.fill(buffer.array(), (byte)0);
             }
-            PosixFileAttributes after = credentialAttributes(path, expectedOwner);
+            PosixFileAttributes after = credentialAttributes(path, expectedOwner, systemdRuntime);
+            byte[] mountAfter = systemdRuntime ? systemdMountIdentity() : null;
             if (!Objects.equals(before.fileKey(), after.fileKey()) || before.size() != after.size()
-                    || !before.lastModifiedTime().equals(after.lastModifiedTime())) throw new IllegalArgumentException();
+                    || !before.lastModifiedTime().equals(after.lastModifiedTime())
+                    || !Arrays.equals(mountBefore, mountAfter)) throw new IllegalArgumentException();
             var decoded = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes));
             char[] password = new char[decoded.remaining()]; decoded.get(password);
@@ -155,7 +218,11 @@ public class AssetCardDataSourceConfiguration {
         finally { if (bytes != null) Arrays.fill(bytes, (byte)0); }
     }
 
-    private static PosixFileAttributes credentialAttributes(Path path, String owner) throws Exception {
+    private static PosixFileAttributes credentialAttributes(Path path, String owner, boolean systemdRuntime) throws Exception {
+        if (systemdRuntime) {
+            verifySystemdCredentialMetadata(path, owner);
+            return Files.readAttributes(path, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        }
         PosixFileAttributes attributes = Files.readAttributes(path, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         boolean ownerMatches = owner.matches("[0-9]+")
                 ? owner.equals(Files.getAttribute(path, "unix:uid", LinkOption.NOFOLLOW_LINKS).toString())
@@ -167,6 +234,38 @@ public class AssetCardDataSourceConfiguration {
                 || mode.equals(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE))))
             throw new IllegalArgumentException();
         return attributes;
+    }
+
+    private static byte[] systemdMountIdentity() throws Exception {
+        try (var stream = Files.newInputStream(Path.of("/proc/self/mountinfo"))) {
+            byte[] metadata = stream.readNBytes(1_048_577);
+            if (metadata.length == 0 || metadata.length > 1_048_576) throw new IllegalArgumentException();
+            return metadata;
+        }
+    }
+
+    private static void verifySystemdCredentialMetadata(Path path, String owner) throws Exception {
+        if (!SYSTEMD_CREDENTIAL_DIRECTORY.equals(System.getenv("CREDENTIALS_DIRECTORY"))
+                || !owner.matches("[1-9][0-9]{0,9}")) throw new IllegalArgumentException();
+        ProcessBuilder builder = new ProcessBuilder("/usr/bin/python3", "-I", "-S", "-B", "-c",
+                SYSTEMD_CREDENTIAL_METADATA_CHECK, owner, path.toString());
+        builder.environment().clear();
+        builder.environment().put("LC_ALL", "C");
+        builder.environment().put("CREDENTIALS_DIRECTORY", SYSTEMD_CREDENTIAL_DIRECTORY);
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        try {
+            process.getOutputStream().close();
+            if (!process.waitFor(2, TimeUnit.SECONDS)) throw new IllegalArgumentException();
+            byte[] output = process.getInputStream().readNBytes(4097);
+            if (process.exitValue() != 0 || !Arrays.equals(output,
+                    "ASSET_CARD_SYSTEMD_CREDENTIAL_METADATA=PASS\n".getBytes(StandardCharsets.US_ASCII)))
+                throw new IllegalArgumentException();
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+            process.getInputStream().close();
+            process.getErrorStream().close();
+        }
     }
 
     private static void validateSettings(AssetCardProperties.Writer settings) {

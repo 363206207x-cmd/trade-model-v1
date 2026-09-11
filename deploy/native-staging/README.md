@@ -69,6 +69,13 @@ All shell entrypoints default to CHECK_ONLY or DRY_RUN and share:
 bash <entrypoint> --manifest /reviewed/non-secret/runtime.manifest
 ```
 
+Both PREPARED and ARMED require the two storage leaves and their trusted parent
+to have been provisioned under separate installation authority before preflight
+or drop-in installation. The mandatory ReadWritePaths are never silently ignored.
+Missing, symlinked or incorrectly owned/mode/group paths reject before replacing
+any existing drop-in. PREPARED keeps all card switches off and does not require
+or claim the ARMED-only quota, window or database-device proof.
+
 `asset-card-runtime-preflight.sh` checks file/owner/permission/base SHA identity,
 credential metadata only, Linux x86_64, Java 17 and libgomp availability. A
 present immutable model pointer also receives checksum-only verification.
@@ -131,6 +138,16 @@ Rotation first retains the old protected inode under a timestamped `.previous`
 name; failures leave the old live file usable. These are protected rollback
 credentials, not logs or temporary plaintext. Their eventual approved retirement
 is an operator action. Output is `RESTART_REQUIRED=YES`, not a hot-rotation claim.
+
+The protected root0400 source and the systemd-delivered runtime credential are
+different trust channels. On the verified systemd255 host, runtime files are
+root:root0440 in a root:root0550 read-only tmpfs and an exact named-user ACL grants
+only the service UID access. Java's POSIX mode alone cannot prove this ACL.
+The dedicated runtime validation therefore uses the already-present
+`/usr/bin/python3` with isolated standard-library metadata inspection; it is not
+a new package installation, Python model runtime or credential-content reader.
+Absence/failure of this dependency must fail closed before ARMED operation;
+PREPARED source-file verification does not claim systemd runtime verification.
 
 The verifier invocation uses the standard JAR's independent main:
 
@@ -197,6 +214,17 @@ or deployment is performed. Applying a drop-in is not proof it has been loaded.
 
 ## Fixed-window SHADOW and verified retention
 
+Owner-only card UI inspection is separate from model publication eligibility.
+The optional non-secret manifest field `OWNER_PREVIEW_USER_ID` defaults to `NONE`;
+only one positive, Session-verified user ID may be configured. The installer
+renders `TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS` without changing SHADOW,
+the three collection switches or the finite-window checks. A missing field in
+an older manifest also means no preview account. The HTTP client cannot select
+this account. Preview shows independently verified price/risk fields, not an
+unqualified model direction, a probability or an old confidence fallback.
+Changing this source configuration is not installation, a restart or a new
+network allowance; every new candidate still requires its own exact identity.
+
 The unified approval package is in
 `docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md`, first
 section. Its 21-GET probe and <=8-hour collection allowance are separate items;
@@ -210,9 +238,17 @@ generates a start time/window ID, never erases a ledger, and never restarts.
 PREPARED cannot accidentally enable collection using the ordinary confirmation.
 Missing/unknown quota remains a refusal, not an assumed exchange limit.
 
-State `/var/lib/rine-logic/asset-card/collection` and archives
-`/var/lib/rine-logic/asset-card/archive` require service-owned 0700 leaf directories
-under trusted root-owned parents. `DATABASE_FILESYSTEM_DEVICE` is an independently
+State `/var/lib/rine-logic-asset-card/collection` and archives
+`/var/lib/rine-logic-asset-card/archive` require 0700 leaf directories owned by the
+actual service UID and GID (both explicitly recorded in the manifest). Their
+dedicated parent `/var/lib/rine-logic-asset-card` must be root:root 0755 with
+unchanged trusted root-owned ancestry and no symlinks. The existing
+`/var/lib/rine-logic` contents, ownership and permissions are not modified.
+The card attachment adds only these two leaves to `ReadWritePaths`; it does not
+reset the base unit's existing business/log writable paths. Before a real start,
+verify under the actual service constraints that the two leaves are writable
+but their root-owned parent is not. Fake-root tests do not replace this check.
+`DATABASE_FILESYSTEM_DEVICE` is an independently
 reviewed non-secret `stat` device identity: the installer compares both visible
 directories with it, but **does not itself prove the actual PGDATA device**.
 The execution preflight must read the real PostgreSQL data location via the

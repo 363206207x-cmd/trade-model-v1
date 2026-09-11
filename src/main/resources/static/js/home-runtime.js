@@ -1057,6 +1057,8 @@
     }
     function applyReadSafetyDowngrade(snapshot, sequence, renderFields) {
         var status = snapshot && snapshot.health && snapshot.health.status;
+        if (["RISK_UNAVAILABLE", "SIGNAL_FAILED", "SIGNAL_AND_RISK_UNAVAILABLE"].indexOf(status) >= 0)
+            return applyFieldSafetyDowngrade(snapshot, sequence, renderFields);
         if (status !== "SOURCE_UNAVAILABLE" && status !== "MODEL_UNAVAILABLE") return false;
         var symbol = String(snapshot && snapshot.symbol || "").toUpperCase();
         var version = Number(snapshot && snapshot.snapshotVersion);
@@ -1064,7 +1066,7 @@
         var coldSource = !current && version === 0 && status === "SOURCE_UNAVAILABLE" && snapshot.signal
             && snapshot.signal.direction === null && snapshot.signal.calibratedConfidence == null
             && snapshot.signal.pLong == null && snapshot.signal.pShort == null
-            && ["INSUFFICIENT_DATA", "UNVALIDATED"].indexOf(snapshot.signal.status) >= 0;
+            && ["INSUFFICIENT_DATA", "UNVALIDATED", "SHADOW"].indexOf(snapshot.signal.status) >= 0;
         // A real failed source can be reported before persistence has allocated any card version.
         // This local empty basis never permits a direction or numeric confidence to be published at version zero.
         if (coldSource) current = { symbol: symbol, snapshotVersion: 0 };
@@ -1080,7 +1082,7 @@
         var clearPrice = sourceUnavailable && (!priceState.observedAt || failureAt.getTime() >= priceState.observedAt);
         var signal = current.signal && Object.assign({}, current.signal, { calibratedConfidence: null, pLong: null, pShort: null });
         if (!signal && snapshot.signal && snapshot.signal.direction == null
-                && ["INSUFFICIENT_DATA", "UNVALIDATED"].indexOf(snapshot.signal.status) >= 0) {
+                && ["INSUFFICIENT_DATA", "UNVALIDATED", "SHADOW"].indexOf(snapshot.signal.status) >= 0) {
             signal = Object.assign({}, snapshot.signal, { calibratedConfidence: null, pLong: null, pShort: null });
         }
         if (modelUnavailable) signal = Object.assign({}, signal, { direction: null, status: "UNVALIDATED",
@@ -1112,6 +1114,37 @@
         }
         return true;
     }
+    function applyFieldSafetyDowngrade(snapshot, sequence, renderFields) {
+        var symbol = String(snapshot.symbol || "").toUpperCase(), version = Number(snapshot.snapshotVersion);
+        var current = assetCardSnapshots.get(symbol), signal = snapshot.signal, status = snapshot.health.status;
+        var signalFailed = status !== "RISK_UNAVAILABLE", riskFailed = status !== "SIGNAL_FAILED";
+        if (sequence != null && sequence !== assetCardRequestSequence || renderFields !== false && document.hidden
+                || homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol) || !current || !current.signal
+                || !Number.isSafeInteger(version) || version <= 0 || version !== current.snapshotVersion
+                || !currentModelCheck(snapshot.health, current) || !assetCardRiskEnvelopeMatches(snapshot, current)
+                || !signal || signal.direction !== current.signal.direction || signal.signalAsOf !== current.signal.signalAsOf)
+            return false;
+        if (signalFailed && (signal.status !== "FAILED" || signal.calibratedConfidence != null || signal.pLong != null || signal.pShort != null)) return false;
+        var risk = snapshot.risk, expectedTypes = Object.keys(assetCardRiskNames);
+        if (riskFailed && (risk.overallLevel != null || !Array.isArray(risk.items) || risk.items.length !== expectedTypes.length
+                || new Set(risk.items.map(function (item) { return item && item.type; })).size !== expectedTypes.length
+                || !risk.items.every(function (item) { return item && expectedTypes.indexOf(item.type) >= 0
+                    && item.assessmentStatus === "UNKNOWN" && item.level == null; }))) return false;
+        // This is a same-identity, checked-at revocation only: never restore a value or change the unaffected field.
+        var safe = Object.assign({}, current, { health: Object.assign({}, snapshot.health) });
+        if (signalFailed) safe.signal = Object.assign({}, current.signal, { status: "FAILED", calibratedConfidence: null, pLong: null, pShort: null });
+        if (riskFailed) safe.risk = risk;
+        assetCardSnapshots.set(symbol, safe);
+        if (signalFailed) assetCardFieldVersions.set(symbol + "|SIGNAL", version);
+        if (riskFailed) assetCardFieldVersions.set(symbol + "|RISK", version);
+        assetCardFieldVersions.set(symbol + "|HEALTH", version);
+        if (renderFields !== false) {
+            if (signalFailed) patchAssetCard(symbol, "SIGNAL");
+            if (riskFailed) patchAssetCard(symbol, "RISK");
+            patchAssetCard(symbol, "HEALTH");
+        }
+        return true;
+    }
     function applyAssetCardEvent(event) {
         if (!event) return;
         var group = String(event.eventType || "").replace(/^ASSET_CARD_/, "");
@@ -1119,8 +1152,23 @@
         var payload = event.payload || event;
         var symbol = String(event.symbol || payload.symbol || "").toUpperCase();
         if (payload.symbol && String(payload.symbol).toUpperCase() !== symbol) return;
-        var version = Number(event.snapshotVersion == null ? payload.snapshotVersion : event.snapshotVersion);
-        if (payload.snapshotVersion != null && Number(payload.snapshotVersion) !== version) return;
+        var transportVersion = Number(event.snapshotVersion == null ? payload.snapshotVersion : event.snapshotVersion);
+        var version = Number(payload.snapshotVersion == null ? transportVersion : payload.snapshotVersion);
+        if (payload.transportVersion != null) {
+            // Card transport and durable signal/risk CAS are separate identities. Neither may be guessed.
+            if (!Number.isSafeInteger(transportVersion) || transportVersion <= 0
+                    || Number(payload.transportVersion) !== transportVersion
+                    || !Number.isSafeInteger(version) || version < 0) return;
+            if (group === "PRICE" && String(payload.priceTradeId) !== String(payload.transportVersion)) return;
+        } else if (payload.snapshotVersion != null && version !== transportVersion) return;
+        if (group === "HEALTH" && payload.health && ["RISK_UNAVAILABLE", "SIGNAL_FAILED", "SIGNAL_AND_RISK_UNAVAILABLE"].indexOf(payload.health.status) >= 0) {
+            var existing = assetCardSnapshots.get(symbol);
+            if (!currentModelCheck(payload.health, existing)) return;
+            var failureSnapshot = Object.assign({}, payload, { symbol: symbol, snapshotVersion: version });
+            if (existing && version === existing.snapshotVersion) applyReadSafetyDowngrade(failureSnapshot, null);
+            else if (!existing || version > existing.snapshotVersion) mergeAssetCardSnapshot(failureSnapshot, true);
+            return;
+        }
         if (group === "HEALTH" && payload.health && ["MODEL_UNAVAILABLE", "SOURCE_UNAVAILABLE"].indexOf(payload.health.status) >= 0) {
             var current = assetCardSnapshots.get(symbol);
             if (current && version < current.snapshotVersion || payload.health.status === "MODEL_UNAVAILABLE" && !currentModelCheck(payload.health, current)) return;

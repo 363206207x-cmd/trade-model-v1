@@ -16,6 +16,148 @@ import static org.mockito.Mockito.*;
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardModelBundleTest {
     @TempDir Path directory;
+    @Test void lifecycleUsesActualLabelAvailabilityWithoutRewritingFixedHorizons() throws Exception {
+        var fixture=lifecycleFixture();
+        var lifecycle=readLifecycle(fixture[0],fixture[1]);
+        assertThat(lifecycle.trainedThrough()).isEqualTo(java.time.Instant.parse("2026-01-03T00:00:00.000000001Z"));
+        assertThat(lifecycle.validUntil()).isEqualTo(java.time.Instant.parse("2030-01-01T00:00:00Z"));
+        assertThat(fixture[1].path("final").path("splits").get(1).path("labelEnd").asText())
+                .isEqualTo("2026-01-02T23:59:59Z");
+        assertThat(fixture[1].path("final").path("splits").get(3).path("labelAvailableAt").asText())
+                .isEqualTo("2026-01-05T00:00:00.000000001Z");
+    }
+    @Test void lifecycleRejectsLabelsWithoutActualAvailabilityEvenWhenOldHorizonIdentityMatches() throws Exception {
+        var fixture=lifecycleFixture();
+        var life=(ObjectNode)fixture[0].path("lifecycle");
+        life.put("trainedThrough",fixture[1].path("final").path("splits").get(1).path("labelEnd").asText());
+        life.put("validatedThrough",fixture[1].path("final").path("splits").get(3).path("labelEnd").asText());
+        fixture[1].set("lifecycle",life.deepCopy());
+        for(var split:fixture[1].path("final").path("splits")) ((ObjectNode)split).remove("labelAvailableAt");
+        assertThatThrownBy(()->readLifecycle(fixture[0],fixture[1])).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void everySplitRequiresActualZonedAvailabilityAndActualAvailabilityEmbargo() {
+        for(int index=0;index<4;index++) for(String bad:List.of("MISSING","2026-01-01 12:00:00","2025-01-01T00:00:00Z")) {
+            var fixture=lifecycleFixture(); var split=(ObjectNode)fixture[1].path("final").path("splits").get(index);
+            if(bad.equals("MISSING")) split.remove("labelAvailableAt"); else split.put("labelAvailableAt",bad);
+            assertThatThrownBy(()->readLifecycle(fixture[0],fixture[1]))
+                    .as("split %s rejects %s",index,bad).isInstanceOf(RuntimeException.class);
+        }
+        var fixture=lifecycleFixture(); var splits=fixture[1].path("final").path("splits");
+        var nextStart=java.time.Instant.parse(splits.get(1).path("start").asText());
+        ((ObjectNode)splits.get(0)).put("labelAvailableAt",nextStart.minusSeconds(14400).plusNanos(1).toString());
+        assertThatThrownBy(()->readLifecycle(fixture[0],fixture[1])).hasMessage("TEMPORAL_LEAKAGE_OR_MISSING_EMBARGO");
+    }
+    @Test void lifecycleCutoffsAreBoundToActualAvailabilityAndExpiredBundlesAreRejected() {
+        for(String field:List.of("trainedThrough","validatedThrough")) {
+            var fixture=lifecycleFixture(); var life=(ObjectNode)fixture[0].path("lifecycle");
+            life.put(field,java.time.Instant.parse(life.path(field).asText()).minusNanos(1).toString());
+            fixture[1].set("lifecycle",life.deepCopy());
+            assertThatThrownBy(()->readLifecycle(fixture[0],fixture[1])).hasMessage("LIFECYCLE_TEMPORAL_OR_PATTERN_MISMATCH");
+        }
+        var fixture=lifecycleFixture(); var life=(ObjectNode)fixture[0].path("lifecycle");
+        life.put("validUntil","2026-01-06T00:00:00Z"); fixture[1].set("lifecycle",life.deepCopy());
+        assertThatThrownBy(()->readLifecycle(fixture[0],fixture[1])).hasMessage("LIFECYCLE_TEMPORAL_OR_PATTERN_MISMATCH");
+    }
+    @Test void finalValidationIsTheInclusiveStartAndExpiryIsExclusiveAtNanosecondPrecision() throws Exception {
+        var fixture=lifecycleFixture(); var life=(ObjectNode)fixture[0].path("lifecycle");
+        life.put("trainedThrough","2026-01-03T08:00:00.000000001+08:00");
+        life.put("validatedThrough","2026-01-05T08:00:00.000000001+08:00");
+        fixture[1].set("lifecycle",life.deepCopy());
+        var lifecycle=readLifecycle(fixture[0],fixture[1]);
+        assertThat(lifecycle.validatedThrough()).isEqualTo(java.time.Instant.parse("2026-01-05T00:00:00.000000001Z"));
+        try(var bundle=testBundle("BTCUSDT","LIFECYCLE")) {
+            setLifecycle(bundle,lifecycle);
+            assertThat(bundle.validatedAt(lifecycle.trainedThrough())).isFalse();
+            assertThat(bundle.validatedAt(lifecycle.validatedThrough().minusNanos(1))).isFalse();
+            assertThat(bundle.validatedAt(lifecycle.validatedThrough())).isTrue();
+            assertThat(bundle.validatedAt(lifecycle.validUntil().minusNanos(1))).isTrue();
+            assertThat(bundle.validatedAt(lifecycle.validUntil())).isFalse();
+            assertThat(bundle.validatedAt(lifecycle.validUntil().plusNanos(1))).isFalse();
+        }
+    }
+    @Test void pythonProducedLifecycleAndJavaReaderUseIdenticalAvailabilityAndBoundaryDecisions() throws Exception {
+        String program="""
+                import sys,json
+                sys.path.insert(0,'scripts')
+                import test_asset_card_model as f
+                fixture=f.lifecycle_fixture()
+                model=f.model
+                start=model.timestamp(fixture['manifest']['lifecycle']['validatedThrough'])
+                end=model.timestamp(fixture['manifest']['lifecycle']['validUntil'])
+                cases=[]
+                for at in (start-model.Decimal('.000000001'),start,end-model.Decimal('.000000001'),end,end+model.Decimal('.000000001')):
+                    try:
+                        model.build_lifecycle(fixture['manifest'],fixture['report']['final'],fixture['train'],at)
+                        allowed=True
+                    except ValueError:
+                        allowed=False
+                    cases.append({'at':model.instant(at),'allowed':allowed})
+                fixture['boundaryCases']=cases
+                print(json.dumps(fixture,allow_nan=False))
+                """;
+        Path output=directory.resolve("TEST_ONLY_lifecycle.json");
+        var process=new ProcessBuilder(System.getProperty("assetCard.testPython","python3"),"-B","-c",program)
+                .directory(Path.of("").toAbsolutePath().toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+        try {
+            assertThat(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS)).as("stdlib-only lifecycle fixture completed").isTrue();
+            assertThat(process.exitValue()).as(Files.readString(output)).isZero();
+            var fixture=new ObjectMapper().readTree(output.toFile());
+            assertThat(fixture.path("dataKind").asText()).isEqualTo("TEST_FIXTURE_ONLY");
+            assertThat(fixture.path("productionModelReady").asBoolean()).isFalse();
+            var lifecycle=readLifecycle((ObjectNode)fixture.path("manifest"),(ObjectNode)fixture.path("report"));
+            assertThat(lifecycle.trainedThrough()).isEqualTo(java.time.Instant.parse("2026-01-03T00:00:00.000000001Z"));
+            assertThat(lifecycle.validatedThrough()).isEqualTo(java.time.Instant.parse("2026-01-05T00:00:00.000000001Z"));
+            assertThat(lifecycle.featureLower()).containsOnly(.1); assertThat(lifecycle.featureUpper()).containsOnly(.9);
+            try(var bundle=testBundle("BTCUSDT","PYTHON_JAVA_LIFECYCLE")) {
+                setLifecycle(bundle,lifecycle);
+                assertThat(fixture.path("boundaryCases")).hasSize(5);
+                for(var boundary:fixture.path("boundaryCases")) {
+                    var at=java.time.Instant.parse(boundary.path("at").asText());
+                    assertThat(bundle.validatedAt(at)).as("Python/Java at %s",at).isEqualTo(boundary.path("allowed").asBoolean());
+                }
+            }
+        } finally { if(process.isAlive()) process.destroyForcibly(); }
+    }
+    private static void setLifecycle(AssetCardModelBundle bundle,AssetCardModelBundle.Lifecycle lifecycle) throws Exception {
+        var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true); field.set(bundle,lifecycle);
+    }
+    private static ObjectNode[] lifecycleFixture() {
+        var json=new ObjectMapper();
+        var manifest=json.createObjectNode();
+        manifest.putObject("releasePolicy").put("riskVersion","TEST_RISK").put("maxFeatureOutlierFraction",.5);
+        var life=manifest.putObject("lifecycle").put("dataVersion","TEST_DATA").put("riskVersion","TEST_RISK")
+                .put("trainedThrough","2026-01-03T00:00:00.000000001Z")
+                .put("validatedThrough","2026-01-05T00:00:00.000000001Z")
+                .put("validUntil","2030-01-01T00:00:00Z").put("maxFeatureOutlierFraction",.5);
+        String pattern="0".repeat(AssetCardFeatureService.FEATURE_NAMES.size());
+        life.putArray("missingPatterns").add(pattern);
+        var lower=life.putArray("featureLower"); var upper=life.putArray("featureUpper");
+        for(int i=0;i<AssetCardFeatureService.FEATURE_NAMES.size();i++) { lower.add(0); upper.add(1); }
+        var report=json.createObjectNode().put("datasetVersion","TEST_DATA");
+        report.set("lifecycle",life.deepCopy());
+        var finalReport=report.putObject("final"); finalReport.putObject("patternMetrics").putObject(pattern);
+        var splits=finalReport.putArray("splits");
+        String[] names={"TRAIN","CALIBRATION","VALIDATION","TEST"};
+        for(int i=0;i<4;i++) splits.addObject().put("name",names[i]).put("count",2)
+                .put("start","2026-01-0"+(i+1)+"T19:00:00Z")
+                .put("end","2026-01-0"+(i+1)+"T19:59:59Z")
+                .put("labelEnd","2026-01-0"+(i+1)+"T23:59:59Z")
+                .put("labelAvailableAt","2026-01-0"+(i+2)+"T00:00:00.000000001Z");
+        // Calibration/test indices own the lifecycle cutoff, not the fixed four-hour label horizon.
+        life.put("trainedThrough",splits.get(1).path("labelAvailableAt").asText());
+        life.put("validatedThrough",splits.get(3).path("labelAvailableAt").asText());
+        report.set("lifecycle",life.deepCopy());
+        return new ObjectNode[]{manifest,report};
+    }
+    private static AssetCardModelBundle.Lifecycle readLifecycle(ObjectNode manifest,ObjectNode report) throws Exception {
+        var method=AssetCardModelBundle.class.getDeclaredMethod("readLifecycle",com.fasterxml.jackson.databind.JsonNode.class,com.fasterxml.jackson.databind.JsonNode.class);
+        method.setAccessible(true);
+        try { return (AssetCardModelBundle.Lifecycle)method.invoke(null,manifest,report); }
+        catch(java.lang.reflect.InvocationTargetException failure) {
+            if(failure.getCause() instanceof RuntimeException cause) throw cause;
+            throw failure;
+        }
+    }
     @Test void registrySelectsOnlyTheExactValidatedAssetAndKeepsBundleIdentitiesIndependent() throws Exception {
         var btc=source("BTC"); var eth=source("ETH");
         try(var registry=registry(s->testBundle(s.equals(btc)?"BTCUSDT":"ETHUSDT",s.equals(btc)?"BTC":"ETH"))) {
@@ -166,14 +308,14 @@ class AssetCardModelBundleTest {
             var bundle=constructor.newInstance(mock(Booster.class),mock(Booster.class),parameters,parameters,"TEST_"+version+"_MODEL","TEST_"+version+"_CAL","TEST_"+version+"_THRESHOLD",thresholds,Map.of(),Set.of(symbol),null);
             setTestLifecycle(bundle);
             var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true);
-            var life=bundle.lifecycle(); field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_"+version+"_DATA","TEST_"+version+"_RISK",life.trainedThrough(),life.validUntil(),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
+            var life=bundle.lifecycle(); field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_"+version+"_DATA","TEST_"+version+"_RISK",life.trainedThrough(),life.validatedThrough(),life.validUntil(),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
             return bundle;
         } catch(Exception failure) { throw new AssertionError(failure); }
     }
     private static void expire(AssetCardModelBundle bundle) {
         try {
             var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true); var life=bundle.lifecycle();
-            field.set(bundle,new AssetCardModelBundle.Lifecycle(life.dataVersion(),life.riskVersion(),java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
+            field.set(bundle,new AssetCardModelBundle.Lifecycle(life.dataVersion(),life.riskVersion(),java.time.Instant.EPOCH,java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
         } catch(Exception failure) { throw new AssertionError(failure); }
     }
     @Test void absentBundleDoesNotInventSamplesMetricsThresholdsOrConfidence() {
@@ -259,18 +401,24 @@ class AssetCardModelBundleTest {
                 "asset_card_dataset_version","TEST_FIXTURE_DATA"));
         attributes.put("asset_card_risk_version","TEST_RISK");
         attributes.put("asset_card_trained_through","2025-01-01T00:00:00Z");
+        attributes.put("asset_card_validated_through","2025-01-02T00:00:00Z");
         attributes.put("asset_card_valid_until","2030-01-01T00:00:00Z");
         String[] names=AssetCardFeatureService.FEATURE_NAMES.toArray(String[]::new);
         var mapper=new ObjectMapper();
         var manifest=mapper.valueToTree(Map.of("modelVersion","TEST_FIXTURE_MODEL","featureVersion",AssetCardFeatureService.FEATURE_VERSION,
                 "calibrationVersion","TEST_FIXTURE_CAL","thresholdVersion","TEST_FIXTURE_THRESHOLD"));
         var report=mapper.valueToTree(Map.of("datasetVersion","TEST_FIXTURE_DATA"));
-        ((ObjectNode)manifest).putObject("lifecycle").put("riskVersion","TEST_RISK").put("trainedThrough","2025-01-01T00:00:00Z").put("validUntil","2030-01-01T00:00:00Z");
+        ((ObjectNode)manifest).putObject("lifecycle").put("riskVersion","TEST_RISK").put("trainedThrough","2025-01-01T00:00:00Z")
+                .put("validatedThrough","2025-01-02T00:00:00Z").put("validUntil","2030-01-01T00:00:00Z");
         AssetCardModelBundle.verifyModelMetadata(attributes,names,"LONG",manifest,report);
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(attributes,names,"SHORT",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(attributes,new String[]{"wrongOrder"},"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
         var synthetic=new HashMap<>(attributes); synthetic.put("asset_card_data_kind","SYNTHETIC_FIXTURE");
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(synthetic,names,"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
+        var wrongValidation=new HashMap<>(attributes); wrongValidation.put("asset_card_validated_through","2025-01-01T00:00:00Z");
+        assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(wrongValidation,names,"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
+        var missingValidation=new HashMap<>(attributes); missingValidation.remove("asset_card_validated_through");
+        assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(missingValidation,names,"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
         ((ObjectNode)manifest).put("calibrationVersion","DIFFERENT_CALIBRATOR");
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(attributes,names,"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
     }
@@ -308,7 +456,7 @@ class AssetCardModelBundleTest {
     private static void setTestLifecycle(AssetCardModelBundle bundle) throws Exception {
         int count=AssetCardFeatureService.FEATURE_NAMES.size();
         var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true);
-        field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA","TEST_RISK",java.time.Instant.EPOCH,java.time.Instant.parse("2100-01-01T00:00:00Z"),
+        field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA","TEST_RISK",java.time.Instant.EPOCH,java.time.Instant.EPOCH,java.time.Instant.parse("2100-01-01T00:00:00Z"),
                 Set.of("0".repeat(count),"1".repeat(count)),Collections.nCopies(count,-1_000_000.0),Collections.nCopies(count,1_000_000.0),.5));
     }
     @Test void v42PopulationAndTimeBlockIntervalsCannotBeReplacedByRawCounts() throws Exception {

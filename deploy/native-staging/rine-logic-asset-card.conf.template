@@ -3,6 +3,7 @@
 LoadCredential=asset-card-db-password:/etc/rine-logic/credentials/asset-card-db-password
 ReadOnlyPaths=/opt/rine-logic/models/asset-card
 Environment="TRADE_MODEL_ASSET_CARD_MODEL_MODE=SHADOW"
+Environment="TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS=@OWNER_PREVIEW_USER_IDS@"
 Environment="TRADE_MODEL_ASSET_CARD_ENABLED=@CARD_ENABLED@"
 Environment="TRADE_MODEL_ASSET_CARD_EXTERNAL_CALLS_ENABLED=@CARD_ENABLED@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_ENABLED=@CARD_ENABLED@"
@@ -15,7 +16,7 @@ Environment="TRADE_MODEL_ASSET_CARD_RETENTION_BATCH_SIZE=128"
 Environment="TRADE_MODEL_ASSET_CARD_ARCHIVE_DIRECTORY=@ARCHIVE_DIRECTORY@"
 Environment="TRADE_MODEL_ASSET_CARD_ARCHIVE_MINIMUM_FREE_BYTES=21474836480"
 Environment="TRADE_MODEL_ASSET_CARD_TRAINING_EXPORT_ENABLED=false"
-ReadWritePaths=-/var/lib/rine-logic/asset-card/collection -/var/lib/rine-logic/asset-card/archive
+ReadWritePaths=/var/lib/rine-logic-asset-card/collection /var/lib/rine-logic-asset-card/archive
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_JDBC_URL=@WRITER_JDBC_URL@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_EXPECTED_DATABASE=@EXPECTED_DATABASE@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_CREDENTIAL_FILE=%d/asset-card-db-password"

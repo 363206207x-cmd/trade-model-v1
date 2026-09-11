@@ -188,7 +188,7 @@ class AssetCardSignalServiceTest {
             var lifecycle = AssetCardModelBundle.class.getDeclaredField("lifecycle");
             lifecycle.setAccessible(true);
             lifecycle.set(bundle, new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK",
-                    Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"), Set.of("0".repeat(featureCount)),
+                    Instant.EPOCH, Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"), Set.of("0".repeat(featureCount)),
                     Collections.nCopies(featureCount, 0.0), Collections.nCopies(featureCount, 2.0), .5));
             assertThat(bundle.validated()).isTrue();
             return bundle;

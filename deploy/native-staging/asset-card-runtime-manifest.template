@@ -20,19 +20,23 @@ CREDENTIAL_SOURCE=/etc/rine-logic/credentials/asset-card-db-password
 CREDENTIAL_ID=asset-card-db-password
 ROOT_UID=REPLACE_ROOT_UID
 SERVICE_UID=REPLACE_SERVICE_UID
+SERVICE_GID=REPLACE_SERVICE_GID
 WRITER_JDBC_URL=REPLACE_NON_SECRET_JDBC_URL
 EXPECTED_DATABASE=REPLACE_DATABASE_NAME
 WRITER_ROLE=rine_asset_card_writer
 MODEL_MODE=SHADOW
 PRODUCTION_MODEL_READY=NO
+# Optional single authenticated account, selected from verified Session identity.
+# Visibility only: does not activate models or grant a collection window.
+OWNER_PREVIEW_USER_ID=NONE
 # PREPARED keeps all card switches off. ARMED is a separately approved, fixed allowance.
 CARD_STARTUP_MODE=PREPARED
 COLLECTION_WINDOW_ID=NOT_CONFIGURED
 COLLECTION_STARTS_AT=NOT_CONFIGURED
 COLLECTION_ENDS_AT=NOT_CONFIGURED
 COLLECTION_SYMBOLS=NONE
-COLLECTION_STATE_DIRECTORY=/var/lib/rine-logic/asset-card/collection
-ARCHIVE_DIRECTORY=/var/lib/rine-logic/asset-card/archive
+COLLECTION_STATE_DIRECTORY=/var/lib/rine-logic-asset-card/collection
+ARCHIVE_DIRECTORY=/var/lib/rine-logic-asset-card/archive
 SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE=0
 SHARED_IP_WEIGHT_LIMIT_PER_MINUTE=0
 SHARED_IP_HEADROOM_CONFIRMED_AT=NOT_CONFIGURED

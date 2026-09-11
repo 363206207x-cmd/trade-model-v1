@@ -100,6 +100,45 @@ function boundEvent(type, version, value, overrides = {}) {
     riskBasisSide: value.risk.riskBasisSide, riskBasisDirection: value.risk.riskBasisDirection,
     riskBasisSignalAsOf: value.risk.riskBasisSignalAsOf, ...overrides });
 }
+// A current read-time field failure must only downgrade its own field, even without a new durable version.
+for (const path of ["SSE", "CARD_GET", "HOME"]) {
+  for (const status of ["RISK_UNAVAILABLE", "SIGNAL_FAILED", "SIGNAL_AND_RISK_UNAVAILABLE"]) {
+    const runtime = fixture(), original = boundSnapshot("LONG", 10);
+    runtime.mergeAssetCardSnapshot(original, true);
+    const riskFailed = status !== "SIGNAL_FAILED", signalFailed = status !== "RISK_UNAVAILABLE";
+    const failed = { ...original, health: { status, reason: "ISOLATED_TEST_FIELD_FAILURE", asOf: priceInstant(30) },
+      signal: signalFailed ? { ...original.signal, status: "FAILED", calibratedConfidence: null, pLong: null, pShort: null } : original.signal,
+      risk: riskFailed ? { ...original.risk, overallLevel: null,
+        items: ["CHASE", "SHOCK", "REVERSAL", "CROWDING", "LIQUIDATION", "LIQUIDITY", "EVENT", "DATA"].map(type => ({
+          type, assessmentStatus: "UNKNOWN", level: null, reason: "ISOLATED_TEST_FIELD_FAILURE" })) } : original.risk };
+    if (path === "SSE") runtime.applyAssetCardEvent(boundEvent("HEALTH", 10, failed));
+    else if (path === "CARD_GET") { runtime.setApi(async () => [failed]); await runtime.lightweightHomeRefresh(); }
+    else runtime.opportunityCard({ ...runtime.home.assets[0], cardSignal: failed }, "BTCUSDT");
+    const result = runtime.snapshot("BTCUSDT");
+    assert.equal(result.spotPrice, original.spotPrice, `${path}/${status}: normal PRICE is isolated`);
+    assert.equal(result.signal.calibratedConfidence, signalFailed ? null : 72, `${path}/${status}: signal downgrade`);
+    assert.equal(result.risk.overallLevel, riskFailed ? null : "HIGH", `${path}/${status}: risk downgrade`);
+    assert.equal(result.snapshotVersion, 10);
+    runtime.applyAssetCardEvent(boundEvent("SIGNAL", 10, original));
+    runtime.mergeAssetCardSnapshot(original, true);
+    assert.equal(runtime.snapshot("BTCUSDT").signal.calibratedConfidence, signalFailed ? null : 72, "same-version restoration is not allowed");
+    assert.equal(runtime.snapshot("BTCUSDT").risk.overallLevel, riskFailed ? null : "HIGH");
+    for (const changed of [
+      { thresholdVersion: "wrong" }, { modelVersion: "wrong" }, { calibrationVersion: "wrong" }, { featureVersion: "wrong" },
+      { signal: { ...failed.signal, signalAsOf: priceInstant(1) } },
+      { risk: { ...failed.risk, riskVersion: "wrong" } },
+      { risk: { ...failed.risk, riskBasisSide: "SHORT" } },
+      { health: { ...failed.health, asOf: "2099-01-01T00:00:00Z" } },
+      { health: { ...failed.health, asOf: "2026-09-09T23:59:59Z" } }
+    ]) {
+      const safe = fixture(); safe.mergeAssetCardSnapshot(original, true);
+      safe.applyAssetCardEvent(boundEvent("HEALTH", 10, { ...failed, ...changed }));
+      assert.equal(safe.snapshot("BTCUSDT").signal.calibratedConfidence, 72, "mismatched identity/time cannot clear current signal");
+      assert.equal(safe.snapshot("BTCUSDT").risk.overallLevel, "HIGH", "mismatched identity/time cannot replace current risk");
+    }
+  }
+}
+
 const v42 = fixture();
 v42.mergeAssetCardSnapshot(boundSnapshot(), true);
 const missingThreshold = fixture();
@@ -183,9 +222,10 @@ assert.equal(sourceRiskMismatch.snapshot("BTCUSDT").risk.overallLevel, null,
 assert.equal(sourceRiskMismatch.nodes.get("BTCUSDT").fields.get("risk").textContent, "—");
 assert.equal(sourceRiskMismatch.requests.length, 0);
 for (const path of ["SSE", "CARD_GET", "HOME"]) {
+  for (const safeStatus of ["INSUFFICIENT_DATA", "SHADOW"]) {
   const zeroHealth = fixture();
   const zeroSource = { ...coldSource, snapshotVersion: 0, spotPrice: null, latestPriceAt: null, priceTradeId: null,
-    signal: { ...coldSource.signal, calibratedConfidence: null, pLong: null, pShort: null } };
+    signal: { ...coldSource.signal, status: safeStatus, calibratedConfidence: null, pLong: null, pShort: null } };
   let zeroHtml;
   if (path === "SSE") zeroHealth.applyAssetCardEvent(boundEvent("HEALTH", 0, zeroSource));
   else if (path === "CARD_GET") { zeroHealth.setApi(async () => [zeroSource]); await zeroHealth.lightweightHomeRefresh(); }
@@ -200,6 +240,7 @@ for (const path of ["SSE", "CARD_GET", "HOME"]) {
   const cleared = JSON.stringify(zeroResult);
   zeroHealth.applyAssetCardEvent(boundEvent("SIGNAL", 0, boundSnapshot()));
   assert.equal(JSON.stringify(zeroHealth.snapshot("BTCUSDT")), cleared, "version zero can never publish a directional signal");
+  }
 }
 for (const override of [
   { signal: { ...coldSource.signal, direction: "LONG" } },
@@ -274,6 +315,33 @@ for (const flag of [false, undefined, "true"]) {
   assert.equal(legacy.intervals.size, 1);
   assert.equal([...legacy.intervals.values()][0].delay, 15000);
 }
+// A server-authorized SHADOW Owner sees actual independent fields, never private model probabilities.
+const ownerPreview = fixture();
+const previewFrame = { ...snapshot("BTCUSDT", 10),
+  signal: { direction: null, status: "SHADOW", calibratedConfidence: null, pLong: null, pShort: null,
+    oneHourState: "OPPORTUNITY", fourHourTrend: "LONG", signalAsOf: "2026-09-10T00:00:00Z" },
+  risk: { overallLevel: "HIGH", items: [{ type: "DATA", assessmentStatus: "ASSESSED", level: "HIGH",
+    evidenceValue: "STALE", source: "BINANCE_SPOT", asOf: "2026-09-10T00:00:00Z", reason: "真实来源已过期", unit: "STATE" }],
+    riskAsOf: "2026-09-10T00:00:00Z", riskBasisSide: "NON_DIRECTIONAL", riskBasisDirection: null,
+    riskBasisSignalAsOf: "2026-09-10T00:00:00Z", riskMarketAsOf: "2026-09-10T00:00:00Z", riskVersion: "test-only-risk" } };
+const previewHtml = ownerPreview.opportunityCard({ ...ownerPreview.home.assets[0], cardSignal: previewFrame }, "BTCUSDT");
+assert.ok(previewHtml.includes('data-live-field="price">$100'));
+assert.ok(previewHtml.includes('data-live-field="confidence">—'));
+assert.ok(previewHtml.includes('data-desktop-hover="risk"'), "independently evidenced DATA risk remains inspectable without a model");
+assert.ok(!previewHtml.includes("99%") && !previewHtml.includes("72%"));
+assert.equal((previewHtml.match(/data-live-field="confidence"/g) || []).length, 1);
+assert.equal(ownerPreview.requests.length, 0);
+const failedPreview = { ...previewFrame, signal: { ...previewFrame.signal, status: "FAILED" },
+  health: { status: "SIGNAL_AND_RISK_UNAVAILABLE", reason: "TEST_OWNER_FIELD_FAILURE", asOf: priceInstant(30) },
+  risk: { ...previewFrame.risk, overallLevel: null,
+    items: ["CHASE", "SHOCK", "REVERSAL", "CROWDING", "LIQUIDATION", "LIQUIDITY", "EVENT", "DATA"].map(type => ({
+      type, assessmentStatus: "UNKNOWN", level: null, reason: "TEST_OWNER_FIELD_FAILURE" })) } };
+ownerPreview.applyAssetCardEvent(boundEvent("HEALTH", 10, failedPreview));
+assert.equal(ownerPreview.snapshot("BTCUSDT").signal.status, "FAILED");
+assert.equal(ownerPreview.snapshot("BTCUSDT").risk.overallLevel, null);
+assert.equal(ownerPreview.snapshot("BTCUSDT").spotPrice, 100);
+assert.equal(ownerPreview.snapshot("BTCUSDT").signal.calibratedConfidence, null);
+
 const cohort = fixture();
 const cohortAssets = cohort.home.assets.map((asset, index) => ({ ...asset, cardSignalDisplayEnabled: index === 0 }));
 cohort.setHome({ ...cohort.home, assets: cohortAssets });
@@ -361,6 +429,27 @@ assert.equal(metadata.snapshot("BTCUSDT").modelVersion, "test-only-model-v2", "P
 
 const base = snapshot("BTCUSDT", 100);
 f.mergeAssetCardSnapshot(base, false);
+// The real SSE transport orders PRICE by the exchange trade ID, not the durable signal/risk CAS.
+const independentTransport = fixture();
+independentTransport.mergeAssetCardSnapshot(snapshot("BTCUSDT", 10), false);
+for (const trade of [901, 902, 903]) {
+  independentTransport.applyAssetCardEvent(event("PRICE", trade, {
+    transportVersion: trade, snapshotVersion: 10, priceTradeId: String(trade),
+    latestPriceAt: priceInstant(trade), spotPrice: trade
+  }));
+}
+independentTransport.flushPrices();
+assert.equal(independentTransport.snapshot("BTCUSDT").spotPrice, 903, "consecutive real PRICE events cannot be discarded for an unchanged durable version");
+assert.equal(independentTransport.snapshot("BTCUSDT").snapshotVersion, 10);
+assert.ok(independentTransport.nodes.get("BTCUSDT").fields.get("price").textContent.includes("903"));
+independentTransport.applyAssetCardEvent(event("PRICE", 904, {
+  transportVersion: 905, snapshotVersion: 10, priceTradeId: "904", latestPriceAt: priceInstant(904), spotPrice: 1
+}));
+assert.equal(independentTransport.snapshot("BTCUSDT").spotPrice, 903, "mismatched transport identity fails closed");
+independentTransport.applyAssetCardEvent(event("PRICE", 905, {
+  transportVersion: 905, snapshotVersion: 10, priceTradeId: "906", latestPriceAt: priceInstant(905), spotPrice: 1
+}));
+assert.equal(independentTransport.snapshot("BTCUSDT").spotPrice, 903, "PRICE transport identity must be its actual trade ID");
 const homeBefore = JSON.stringify(f.home), ethBefore = JSON.stringify(f.nodes.get("ETHUSDT"));
 const clockBefore = f.snapshot("BTCUSDT").cardAsOf;
 f.applyAssetCardEvent(event("PRICE", 104, { spotPrice: 104, latestPriceAt: priceInstant(104), cardAsOf: "2099-01-01T00:00:00Z", signal: { direction: "SHORT" } }));

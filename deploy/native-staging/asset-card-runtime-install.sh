@@ -30,6 +30,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   line=${line//@WRITER_JDBC_URL@/$WRITER_JDBC_URL}
   line=${line//@EXPECTED_DATABASE@/$EXPECTED_DATABASE}
   line=${line//@SERVICE_UID@/$SERVICE_UID}
+  line=${line//@OWNER_PREVIEW_USER_IDS@/$OWNER_PREVIEW_USER_IDS}
   line=${line//@CARD_ENABLED@/$CARD_ENABLED}
   line=${line//@ARCHIVE_DIRECTORY@/$ARCHIVE_DIRECTORY}
   printf '%s\n' "$line"

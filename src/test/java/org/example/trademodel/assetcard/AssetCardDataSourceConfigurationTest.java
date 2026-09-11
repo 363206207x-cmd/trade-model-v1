@@ -66,6 +66,199 @@ class AssetCardDataSourceConfigurationTest {
     }
 
     @Test
+    void systemdCredentialValidationHasAnExactRuntimeBoundaryWithoutRelaxingProtectedSources() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/org/example/trademodel/assetcard/AssetCardDataSourceConfiguration.java"));
+        assertThat(source).contains("/run/credentials/rine-logic.service/asset-card-db-password",
+                "SYSTEMD_CREDENTIAL_METADATA_CHECK", "CREDENTIALS_DIRECTORY", "system.posix_acl_access",
+                "nosymfollow", "mountBefore", "mountAfter");
+        assertThat(source).contains("\"/usr/bin/python3\", \"-I\", \"-S\", \"-B\"", "environment().clear()",
+                "getOutputStream().close()", "waitFor(2", "readNBytes(4097)");
+        assertThat(source).doesNotContain("getenv(\"PASSWORD\")", "getenv(\"ASSET_CARD_PASSWORD\")");
+        // Existing 0400/0600 source files remain usable with no Python dependency or group-read allowance.
+        Path sourceFile = temporary.toRealPath().resolve("protected-source");
+        Files.writeString(sourceFile, "isolated-protected-source");
+        Files.setPosixFilePermissions(sourceFile, PosixFilePermissions.fromString("r--------"));
+        char[] read = AssetCardDataSourceConfiguration.readCredential(sourceFile, Files.getOwner(sourceFile).getName());
+        try { assertThat(read.length).isPositive(); } finally { java.util.Arrays.fill(read, '\0'); }
+        Files.setPosixFilePermissions(sourceFile, PosixFilePermissions.fromString("r--r-----"));
+        assertThatThrownBy(() -> AssetCardDataSourceConfiguration.readCredential(sourceFile, Files.getOwner(sourceFile).getName()))
+                .hasMessage("ASSET_CARD_CREDENTIAL_INVALID").hasNoCause();
+    }
+
+    @Test
+    void realLinuxSystemdAclAndReadOnlyMountPermitOnlyTheExactServiceIdentity() throws Exception {
+        // Read the exact production helper, never a test replacement. No real credentials are used.
+        var helperField = AssetCardDataSourceConfiguration.class.getDeclaredField("SYSTEMD_CREDENTIAL_METADATA_CHECK");
+        helperField.setAccessible(true);
+        String helper = (String) helperField.get(null);
+        boolean docker;
+        try { docker = org.testcontainers.DockerClientFactory.instance().isDockerAvailable(); }
+        catch (RuntimeException absent) { docker = false; }
+        boolean ci = "true".equalsIgnoreCase(System.getenv("CI"));
+        if (ci) assertThat(docker).as("CI must execute the real Linux credential test").isTrue();
+        org.junit.jupiter.api.Assumptions.assumeTrue(docker, "Disposable Linux runtime unavailable; no server fallback");
+        String directory = "/run/credentials/rine-logic.service";
+        var image = new org.testcontainers.images.builder.ImageFromDockerfile("v42-credential-local-" + UUID.randomUUID(), true)
+                .withFileFromString("Dockerfile", """
+                    FROM eclipse-temurin:17-jre-jammy AS java
+                    FROM python:3.12-slim
+                    COPY --from=java /opt/java/openjdk /opt/java/openjdk
+                    RUN ln -s /usr/local/bin/python3 /usr/bin/python3
+                    """);
+        // No host mounts, socket or network. SYS_ADMIN is only for this disposable namespace's tmpfs.
+        // Docker's local-volume option parser does not support MS_NOSYMFOLLOW, so use the Linux syscall.
+        // docker-default AppArmor denies mount even with SYS_ADMIN. Only this no-network,
+        // no-host-mount synthetic fixture opts out; no host or deployment policy is changed.
+        try (var runtime = new org.testcontainers.containers.GenericContainer<>(image)
+                .withNetworkMode("none")
+                .withCreateContainerCmdModifier(command -> command.getHostConfig()
+                        .withCapAdd(com.github.dockerjava.api.model.Capability.SYS_ADMIN)
+                        .withSecurityOpts(java.util.List.of("apparmor=unconfined")))
+                .withCommand("/usr/bin/python3", "-I", "-S", "-B", "-c", "import time; print('READY',flush=True); time.sleep(180)")
+                .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forLogMessage(".*READY.*", 1))) {
+                copyCredentialProbe(runtime);
+                runtime.start();
+                var kernel = runtime.execInContainer("/usr/bin/python3", "-I", "-S", "-B", "-c", """
+                    import gzip,os
+                    p='/proc/config.gz'
+                    missing=os.path.isfile(p) and '# CONFIG_TMPFS_POSIX_ACL is not set' in gzip.open(p,'rt').read().splitlines()
+                    print('LINUXKIT_WITHOUT_TMPFS_ACL' if 'linuxkit' in os.uname().release and missing else 'RUN_REQUIRED')
+                    """);
+                assertThat(kernel.getExitCode()).isZero();
+                boolean unsupportedLocalKernel = "LINUXKIT_WITHOUT_TMPFS_ACL\n".equals(kernel.getStdout());
+                if (ci) assertThat(unsupportedLocalKernel).as("Required Linux CI may not skip real tmpfs ACL verification").isFalse();
+                if (!ci && System.getProperty("os.name").startsWith("Mac"))
+                    org.junit.jupiter.api.Assumptions.assumeFalse(unsupportedLocalKernel,
+                            "LOCAL_KERNEL_TMPFS_POSIX_ACL_UNAVAILABLE; required exact-head Linux CI must execute, not skip");
+                var seeded = runtime.execInContainer("/usr/bin/python3", "-I", "-S", "-B", "-c", """
+                    import os,struct,ctypes
+                    d='/run/credentials/rine-logic.service'; p=d+'/asset-card-db-password'
+                    os.makedirs(d,mode=0o550)
+                    libc=ctypes.CDLL(None,use_errno=True)
+                    assert libc.mount(b'tmpfs',d.encode(),b'tmpfs',2|4|8|256,b'size=1m,mode=0550')==0,ctypes.get_errno()
+                    with open(p,'xb') as f: f.write(b'isolated-test-credential-never-reported')
+                    os.chown(d,0,0); os.chown(p,0,0)
+                    for path,perm in ((d,5),(p,4)):
+                        os.chmod(path,0o550 if path==d else 0o440)
+                        entries=((1,perm,0xffffffff),(2,perm,999),(4,0,0xffffffff),(16,perm,0xffffffff),(32,0,0xffffffff))
+                        os.setxattr(path,'system.posix_acl_access',struct.pack('<I',2)+b''.join(struct.pack('<HHI',*x) for x in entries))
+                    print('SYNTHETIC_METADATA_READY')
+                    """);
+                assertThat(seeded.getExitCode()).as("Synthetic mount/ACL fixture: %s", seeded.getStderr()).isZero();
+                assertThat(seeded.getStdout()).isEqualTo("SYNTHETIC_METADATA_READY\n");
+                    remountCredential(runtime, true);
+                    assertMetadata(runtime, helper, "999", directory, directory + "/asset-card-db-password", true);
+                    assertMetadata(runtime, helper, "998", directory, directory + "/asset-card-db-password", false);
+                    assertMetadata(runtime, helper, "999", "/run/credentials/other.service", directory + "/asset-card-db-password", false);
+                    assertMetadata(runtime, helper, "999", directory, directory + "/different-secret", false);
+                    assertJavaCredential(runtime, true);
+                    // An extra named ACL entry is forbidden even when it grants zero access.
+                    remountCredential(runtime, false);
+                    var extra = runtime.execInContainer("/usr/bin/python3", "-I", "-S", "-B", "-c", """
+                        import os,struct
+                        p='/run/credentials/rine-logic.service/asset-card-db-password'
+                        entries=((1,4,0xffffffff),(2,4,999),(2,0,1001),(4,0,0xffffffff),(16,4,0xffffffff),(32,0,0xffffffff))
+                        os.setxattr(p,'system.posix_acl_access',struct.pack('<I',2)+b''.join(struct.pack('<HHI',*x) for x in entries))
+                        """);
+                    assertThat(extra.getExitCode()).isZero();
+                    remountCredential(runtime, true);
+                    assertMetadata(runtime, helper, "999", directory, directory + "/asset-card-db-password", false);
+                    assertJavaCredential(runtime, false);
+                    // Restore the exact ACL, proving the next negative case fails for its own reason.
+                    remountCredential(runtime, false);
+                    var restored = runtime.execInContainer("/usr/bin/python3", "-I", "-S", "-B", "-c", """
+                        import os,struct
+                        p='/run/credentials/rine-logic.service/asset-card-db-password'
+                        entries=((1,4,0xffffffff),(2,4,999),(4,0,0xffffffff),(16,4,0xffffffff),(32,0,0xffffffff))
+                        os.setxattr(p,'system.posix_acl_access',struct.pack('<I',2)+b''.join(struct.pack('<HHI',*x) for x in entries))
+                        """);
+                    assertThat(restored.getExitCode()).isZero();
+                    remountCredential(runtime, true);
+                    assertMetadata(runtime, helper, "999", directory, directory + "/asset-card-db-password", true);
+                    assertJavaCredential(runtime, true);
+                // Identical UID, content and valid ACL: only the writable mount is changed.
+                remountCredential(runtime, false);
+                assertMetadata(runtime, helper, "999", directory, directory + "/asset-card-db-password", false);
+                assertJavaCredential(runtime, false);
+                remountCredential(runtime, true);
+                assertJavaCredential(runtime, true);
+        }
+    }
+
+    private static void remountCredential(org.testcontainers.containers.GenericContainer<?> runtime, boolean readOnly) throws Exception {
+        var result = runtime.execInContainer("/usr/bin/python3", "-I", "-S", "-B", "-c", """
+                import ctypes,sys
+                libc=ctypes.CDLL(None,use_errno=True)
+                flags=32|2|4|8|256|(1 if sys.argv[1]=='ro' else 0)
+                assert libc.mount(None,b'/run/credentials/rine-logic.service',None,flags,None)==0,ctypes.get_errno()
+                """, readOnly ? "ro" : "rw");
+        assertThat(result.getExitCode()).isZero();
+        assertThat(result.getStderr()).isEmpty();
+    }
+
+    private static final String DROP_TEST_IDENTITY = """
+            import os,sys
+            os.setgroups([]); os.setgid(988); os.setuid(999)
+            assert os.geteuid()==999
+            with open('/proc/self/status') as f:
+                assert all(int(line.split()[1],16)==0 for line in f if line.startswith(('CapEff:','CapPrm:','CapAmb:')))
+            os.execv(sys.argv[1],sys.argv[1:])
+            """;
+
+    private static void assertMetadata(org.testcontainers.containers.GenericContainer<?> runtime, String helper,
+            String uid, String directory, String path, boolean allowed) throws Exception {
+        var result = runtime.execInContainer("/usr/bin/env", "-i", "LC_ALL=C", "CREDENTIALS_DIRECTORY=" + directory,
+                "/usr/bin/python3", "-I", "-S", "-B", "-c", DROP_TEST_IDENTITY,
+                "/usr/bin/python3", "-I", "-S", "-B", "-c", helper, uid, path);
+        assertThat(result.getExitCode()).isEqualTo(allowed ? 0 : 2);
+        assertThat(result.getStdout()).isEqualTo("ASSET_CARD_SYSTEMD_CREDENTIAL_METADATA=" + (allowed ? "PASS\n" : "FAIL\n"));
+        assertThat(result.getStderr()).isEmpty();
+    }
+
+    private static void assertJavaCredential(org.testcontainers.containers.GenericContainer<?> runtime, boolean allowed) throws Exception {
+        var result = runtime.execInContainer("/usr/bin/env", "-i", "LC_ALL=C", "CREDENTIALS_DIRECTORY=/run/credentials/rine-logic.service",
+                "/usr/bin/python3", "-I", "-S", "-B", "-c", DROP_TEST_IDENTITY,
+                "/opt/java/openjdk/bin/java", "-cp", "/fixture/classes:/fixture/test-classes:/fixture/lib/*",
+                LinuxCredentialProbe.class.getName(), "/run/credentials/rine-logic.service/asset-card-db-password", "999");
+        assertThat(result.getExitCode()).isEqualTo(allowed ? 0 : 2);
+        assertThat(result.getStdout()).isEqualTo(allowed ? "JAVA_CREDENTIAL_READ=PASS\n"
+                : "JAVA_CREDENTIAL_READ=FAIL:IllegalArgumentException\n");
+        assertThat(result.getStderr()).isEmpty();
+    }
+
+    private static void copyCredentialProbe(org.testcontainers.containers.GenericContainer<?> runtime) throws Exception {
+        String packagePath = "org/example/trademodel/assetcard/";
+        try (var files = Files.list(Path.of("target/classes/" + packagePath))) {
+            for (Path file : files.filter(p -> p.getFileName().toString().startsWith("AssetCardDataSourceConfiguration")
+                    || p.getFileName().toString().startsWith("AssetCardProperties")).toList())
+                runtime.withCopyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(file),
+                        "/fixture/classes/" + packagePath + file.getFileName());
+        }
+        runtime.withCopyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(
+                Path.of("target/test-classes/" + LinuxCredentialProbe.class.getName().replace('.', '/') + ".class")),
+                "/fixture/test-classes/" + LinuxCredentialProbe.class.getName().replace('.', '/') + ".class");
+        for (String path : System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")).split(java.io.File.pathSeparator)) {
+            String name = Path.of(path).getFileName().toString();
+            if (name.startsWith("spring-") || name.startsWith("HikariCP-") || name.startsWith("slf4j-api-"))
+                runtime.withCopyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(path), "/fixture/lib/" + name);
+        }
+    }
+
+    public static final class LinuxCredentialProbe {
+        public static void main(String[] arguments) {
+            char[] password = null;
+            try {
+                password = AssetCardDataSourceConfiguration.readCredential(Path.of(arguments[0]), arguments[1]);
+                if (password.length < 1) throw new IllegalStateException();
+                System.out.println("JAVA_CREDENTIAL_READ=PASS");
+            } catch (Throwable failure) {
+                System.out.println("JAVA_CREDENTIAL_READ=FAIL:" + failure.getClass().getSimpleName());
+                System.exit(2);
+            } finally { if (password != null) java.util.Arrays.fill(password, '\0'); }
+        }
+    }
+
+    @Test
     void candidateAclFailurePreservesOldPoolAndSuccessfulRotationDrainsLeasedOldConnection() throws Exception {
         var properties = properties();
         var old = pool("PASS");

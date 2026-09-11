@@ -210,12 +210,13 @@ public final class AssetCardModelBundle implements AutoCloseable {
     private volatile boolean drifted;
     private final ReentrantReadWriteLock resources=new ReentrantReadWriteLock();
     private Lifecycle lifecycle;
-    public record Lifecycle(String dataVersion,String riskVersion,Instant trainedThrough,Instant validUntil,
+    public record Lifecycle(String dataVersion,String riskVersion,Instant trainedThrough,Instant validatedThrough,Instant validUntil,
                             Set<String> missingPatterns,List<Double> featureLower,List<Double> featureUpper,
                             double maxFeatureOutlierFraction) {
         public Lifecycle {
             require(dataVersion!=null && !dataVersion.isBlank() && riskVersion!=null && !riskVersion.isBlank()
-                    && trainedThrough!=null && validUntil!=null && trainedThrough.isBefore(validUntil),"INVALID_MODEL_LIFECYCLE");
+                    && trainedThrough!=null && validatedThrough!=null && validUntil!=null
+                    && !trainedThrough.isAfter(validatedThrough) && validatedThrough.isBefore(validUntil),"INVALID_MODEL_LIFECYCLE");
             missingPatterns=Set.copyOf(missingPatterns); featureLower=Collections.unmodifiableList(new ArrayList<>(featureLower));
             featureUpper=Collections.unmodifiableList(new ArrayList<>(featureUpper));
             require(!missingPatterns.isEmpty() && featureLower.size()==AssetCardFeatureService.FEATURE_NAMES.size()
@@ -240,7 +241,7 @@ public final class AssetCardModelBundle implements AutoCloseable {
     }
     public boolean validated() { return validatedAt(Instant.now()); }
     public boolean validatedAt(Instant at) { return !closed && !drifted && longModel!=null && shortModel!=null && lifecycle!=null
-            && at!=null && !at.isBefore(lifecycle.trainedThrough()) && !at.isAfter(lifecycle.validUntil()); }
+            && at!=null && !at.isBefore(lifecycle.validatedThrough()) && at.isBefore(lifecycle.validUntil()); }
     public String reason() { return closed?"MODEL_CLOSED":drifted?"FEATURE_DISTRIBUTION_DRIFT_SHADOW":reason; }
     public Thresholds thresholds() { return thresholds; }
     public Map<String,Map<String,RiskDistribution>> riskDistributions() { return riskDistributions; }
@@ -416,7 +417,7 @@ public final class AssetCardModelBundle implements AutoCloseable {
             JsonNode test=fold.path("splits").get(3);
             Instant testStart=Instant.parse(requiredText(test,"start"));
             require(lastTestEnd==null || testStart.isAfter(lastTestEnd),"OVERLAPPING_WALK_FORWARD_TESTS");
-            lastTestEnd=Instant.parse(requiredText(test,"labelEnd"));
+            lastTestEnd=labelAvailableAt(test);
         }
         require(report.path("final").equals(folds.get(folds.size()-1)),"FINAL_REPORT_NOT_LAST_FOLD");
         // Do not trust productionModelReady / passed / validated booleans; every gate above is recomputed.
@@ -424,16 +425,12 @@ public final class AssetCardModelBundle implements AutoCloseable {
 
     private static void verifyFold(JsonNode fold,JsonNode policy) {
         require(fold.path("embargoSeconds").asInt()==14400,"MISSING_FOUR_HOUR_EMBARGO");
-        JsonNode splits=fold.path("splits"); require(splits.isArray() && splits.size()==4,"INDEPENDENT_SPLITS_REQUIRED");
-        Instant previousEnd=null;
-        String[] names={"TRAIN","CALIBRATION","VALIDATION","TEST"};
+        JsonNode splits=fold.path("splits");
+        verifySplitTimes(splits);
         for(int i=0;i<4;i++) {
-            JsonNode split=splits.get(i); require(names[i].equals(requiredText(split,"name")),"INVALID_SPLIT_ORDER");
-            Instant start=Instant.parse(requiredText(split,"start")),end=Instant.parse(requiredText(split,"end")),labelEnd=Instant.parse(requiredText(split,"labelEnd"));
-            require(!start.isAfter(end) && !end.plusSeconds(14400).isAfter(labelEnd)
-                    && (previousEnd==null || !start.isBefore(previousEnd.plusSeconds(14400))),"TEMPORAL_LEAKAGE_OR_MISSING_EMBARGO");
+            JsonNode split=splits.get(i);
             int minimum=minimumSplitSamples(policy,i);
-            require(positiveInt(split,"count")>=minimum,"INSUFFICIENT_SPLIT_SAMPLES"); previousEnd=labelEnd;
+            require(positiveInt(split,"count")>=minimum,"INSUFFICIENT_SPLIT_SAMPLES");
         }
         JsonNode sides=fold.path("sides"); require(sides.size()==2,"DUAL_MODEL_METRICS_REQUIRED");
         for(String side:List.of("LONG","SHORT")) {
@@ -493,6 +490,27 @@ public final class AssetCardModelBundle implements AutoCloseable {
         for(String key:List.of("brier","ece","logLoss","hitRate")) {
             JsonNode band=u.path("intervals").path(key); double lower=number(band,"lower"),upper=number(band,"upper");
             require(lower>=0 && upper>=lower && upper-lower<=number(policy,"max"+Character.toUpperCase(key.charAt(0))+key.substring(1)+"CiWidth"),"UNVALIDATED_METRIC_UNCERTAINTY:"+key);
+        }
+    }
+    private static Instant labelAvailableAt(JsonNode split) {
+        Instant labelEnd=Instant.parse(requiredText(split,"labelEnd"));
+        Instant available=Instant.parse(requiredText(split,"labelAvailableAt"));
+        require(!available.isBefore(labelEnd),"LABEL_AVAILABILITY_PRECEDES_FIXED_HORIZON");
+        return available;
+    }
+    private static void verifySplitTimes(JsonNode splits) {
+        require(splits.isArray() && splits.size()==4,"INDEPENDENT_SPLITS_REQUIRED");
+        Instant previousAvailable=null;
+        String[] names={"TRAIN","CALIBRATION","VALIDATION","TEST"};
+        for(int i=0;i<4;i++) {
+            JsonNode split=splits.get(i);
+            require(names[i].equals(requiredText(split,"name")),"INVALID_SPLIT_ORDER");
+            Instant start=Instant.parse(requiredText(split,"start")),end=Instant.parse(requiredText(split,"end"));
+            Instant horizon=Instant.parse(requiredText(split,"labelEnd")),available=labelAvailableAt(split);
+            require(!start.isAfter(end) && !end.plusSeconds(14400).isAfter(horizon)
+                    && (previousAvailable==null || !start.isBefore(previousAvailable.plusSeconds(14400))),
+                    "TEMPORAL_LEAKAGE_OR_MISSING_EMBARGO");
+            previousAvailable=available;
         }
     }
     private static void verifyV42Pair(JsonNode pair,JsonNode policy) {
@@ -634,12 +652,18 @@ public final class AssetCardModelBundle implements AutoCloseable {
         life.path("featureUpper").forEach(v->upper.add(v.isNull()?null:v.asDouble(Double.NaN)));
         Set<String> patterns=new HashSet<>(); life.path("missingPatterns").forEach(v->patterns.add(v.asText()));
         Set<String> tested=new HashSet<>(); report.path("final").path("patternMetrics").fieldNames().forEachRemaining(tested::add);
-        require(patterns.equals(tested) && requiredText(life,"trainedThrough").equals(report.path("final").path("splits").get(1).path("labelEnd").asText())
-                && requiredText(life,"validatedThrough").equals(report.path("final").path("splits").get(3).path("labelEnd").asText())
-                && Instant.parse(requiredText(life,"validUntil")).isAfter(Instant.parse(requiredText(life,"validatedThrough")))
-                && !Instant.now().isBefore(Instant.parse(requiredText(life,"validatedThrough"))),"LIFECYCLE_TEMPORAL_OR_PATTERN_MISMATCH");
-        return new Lifecycle(requiredText(life,"dataVersion"),requiredText(life,"riskVersion"),Instant.parse(requiredText(life,"trainedThrough")),
-                Instant.parse(requiredText(life,"validUntil")),patterns,lower,upper,number(life,"maxFeatureOutlierFraction"));
+        JsonNode splits=report.path("final").path("splits");
+        verifySplitTimes(splits);
+        Instant trainedThrough=Instant.parse(requiredText(life,"trainedThrough"));
+        Instant validatedThrough=Instant.parse(requiredText(life,"validatedThrough"));
+        Instant validUntil=Instant.parse(requiredText(life,"validUntil"));
+        Instant checkedAt=Instant.now();
+        require(patterns.equals(tested) && trainedThrough.equals(labelAvailableAt(splits.get(1)))
+                && validatedThrough.equals(labelAvailableAt(splits.get(3)))
+                && validUntil.isAfter(validatedThrough) && !checkedAt.isBefore(validatedThrough) && checkedAt.isBefore(validUntil),
+                "LIFECYCLE_TEMPORAL_OR_PATTERN_MISMATCH");
+        return new Lifecycle(requiredText(life,"dataVersion"),requiredText(life,"riskVersion"),trainedThrough,
+                validatedThrough,validUntil,patterns,lower,upper,number(life,"maxFeatureOutlierFraction"));
     }
     private static AssetCardBetaCalibration.Parameters calibration(JsonNode n) { return new AssetCardBetaCalibration.Parameters(number(n,"a"),number(n,"b"),number(n,"c"),number(n,"epsilon")); }
     static void verifyModelIdentity(Booster model,String side,JsonNode manifest,JsonNode report) throws Exception {
@@ -655,6 +679,7 @@ public final class AssetCardModelBundle implements AutoCloseable {
                 && requiredText(report,"datasetVersion").equals(attributes.get("asset_card_dataset_version"))
                 && requiredText(manifest.path("lifecycle"),"riskVersion").equals(attributes.get("asset_card_risk_version"))
                 && requiredText(manifest.path("lifecycle"),"trainedThrough").equals(attributes.get("asset_card_trained_through"))
+                && requiredText(manifest.path("lifecycle"),"validatedThrough").equals(attributes.get("asset_card_validated_through"))
                 && requiredText(manifest.path("lifecycle"),"validUntil").equals(attributes.get("asset_card_valid_until"))
                 && Arrays.asList(featureNames).equals(AssetCardFeatureService.FEATURE_NAMES),"MODEL_IDENTITY_OR_SIDE_MISMATCH");
     }
