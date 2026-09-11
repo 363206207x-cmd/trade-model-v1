@@ -107,7 +107,43 @@ sources over HTTPS succeeded. No third-party registry/mirror or host package ins
 Carrier architecture-specific image `sha256:0d98c7c4ac8fdbd4143a3875675aabea1c7e38ac2c90addfd836ad9a64a2095c`,
 Java `17.0.20+8`, libgomp1 `12.3.0-1ubuntu1~22.04.3`; `libgomp.so.1` is present.
 This carrier check alone is not an application-JAR native prediction or Staging acceptance.
-Candidate-JAR prediction and final-head CI remain pending at this checkpoint.
+### Actual standard-JAR native prediction (local acceptance only)
+
+Candidate source commit **`656476d20a974a31cee1c09de4d01052767c088a`** was clean. Its standard JAR
+was built with the explicit native-evidence profile in a separate packaging process; only that
+process received the actual worktree's Git directory. Embedded Git identity matched the candidate
+and `git.dirty=false`. The full regression above ran without those Git-location overrides.
+JAR SHA-256: `9b5ff7d3b26e3acd67becd60c62edff8f34b3c5d1bb36871f0e831e7fdc34a5e`.
+
+`asset-card-native-staging-matrix.sh` actually ran the standard JAR's non-Web probe using
+Boot PropertiesLauncher in the disposable Linux x86_64 Java 17 carrier, network disabled,
+non-root, read-only root/model/JAR mounts, and executable private temporary native extraction.
+The cached image index used to launch it was
+`sha256:1bef21f732b9d96a66e7b6fce36f3ddd77a7081730ef7e6038d62e12596d7782`.
+The first attempt addressed the architecture submanifest without a cache alias and returned
+`IMAGE_NOT_CACHED` / exit 78 without inference; the verified cached index then succeeded.
+
+- `CANDIDATE_PROVENANCE_STATUS=PASS`, `NATIVE_STATUS=PASS`, `FIXTURE_PARITY_STATUS=PASS`, exit **0**.
+- Java **17.0.20+8**, Python and Java XGBoost **2.1.4**; native library bytes match the candidate JAR.
+- LONG model SHA: `085a61c45b1f92fc0790788852c1ad6b7b9015e1f30b32f719869f6e4faebb13`.
+- SHORT model SHA: `b10e591d3ce9f2537da9d34f04fdf3254b2a2c0f6b390fdb01e00340f29d5fe0`.
+- Versions `TEST_FIXTURE_LONG_MODEL_V1` / `TEST_FIXTURE_SHORT_MODEL_V1`, with separate
+  `TEST_FIXTURE_LONG_BETA_V1` / `TEST_FIXTURE_SHORT_BETA_V1` calibration parameters.
+- Three identical float32 inference rows, **45** features, `SPOT_CARD_FEATURES_V2_SIGNED_PIT`.
+- LONG raw/Beta and SHORT raw/Beta maximum absolute errors are all **0.0**, tolerance **1e-7**.
+- Actual loaded XGBoost library SHA: `892797c8a9cadfb05578a26cddd42c84f0834206bd3da06ee960282edbdf0506`.
+- Actual loaded `libgomp.so.1` SHA: `d46f9225c1883039e8a6853e6d96ca1af11d034ce186a090952e4a7c8a7c2fdc`.
+  The Java mapping probe does not know the package version (`UNKNOWN`); the container's separate
+  package query verified `12.3.0-1ubuntu1~22.04.3` as recorded above.
+- The script's exit cleanup deleted its temporary fixture models/manifest. No fixture entered Git,
+  a production model directory, a runtime link, a database, or an external service.
+- Log: `/private/tmp/v42-native-candidate-linux-retry.log`. This is **LOCAL_STANDARD_JAR** evidence,
+  not actual service startup, live writer wiring, real model quality, or real Staging acceptance.
+
+Post-commit real outer gate with actual online PR read returned `IMPLEMENTATION_ALLOWED=true`,
+`REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`, `RESOLUTION_BLOCK_REASON=NONE`, count **64**.
+An earlier sandboxed PR read returned `GH_NOT_AVAILABLE` and correctly failed closed; its output
+was not substituted for the successful online gate. Final pushed-Head CI is recorded on PR #1295.
 
 Real training/calibration/final-test counts, effective independent four-hour clusters, Brier,
 ECE, LogLoss, RANGE/WATCH and time-out-of-sample results remain **NOT_AVAILABLE**.
