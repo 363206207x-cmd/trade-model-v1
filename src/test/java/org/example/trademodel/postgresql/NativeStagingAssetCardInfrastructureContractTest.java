@@ -65,11 +65,56 @@ class NativeStagingAssetCardInfrastructureContractTest {
     @Test void releaseMetadataCannotRedirectHashingToAnArbitrarySecretFile() throws Exception {
         Fixture fixture=fixture();
         Files.writeString(fixture.manifest(), Files.readString(fixture.manifest())
-                .replace("RELEASE_METADATA=/opt/rine-logic/release-metadata.json", "RELEASE_METADATA=/opt/rine-logic/password-backup"));
+                .replace("RELEASE_METADATA=/opt/rine-logic/current/deployment-metadata.txt", "RELEASE_METADATA=/opt/rine-logic/password-backup"));
         write(fixture.root().resolve("opt/rine-logic/password-backup"),"SYNTHETIC_SECRET_MUST_NOT_BE_HASHED","rw-------");
         Result denied=run("asset-card-runtime-preflight.sh",fixture);
         assertThat(denied.code()).isNotZero();
         assertThat(denied.output()).contains("RELEASE_METADATA_INVALID").doesNotContain("SYNTHETIC_SECRET_MUST_NOT_BE_HASHED");
+    }
+
+    @Test void deploymentMetadataRequiresExactThreeFieldsFullIdentitiesAndARealUtcInstant() throws Exception {
+        Fixture fixture=fixture();
+        String valid=Files.readString(fixture.root().resolve("opt/rine-logic/current/deployment-metadata.txt"));
+        Result accepted=run("asset-card-runtime-install.sh",fixture);
+        assertThat(accepted.code()).withFailMessage(accepted.output()).isZero();
+        assertThat(accepted.output()).contains("ACTION=DRY_RUN");
+        for(String malformed:List.of(
+                valid.replace("a".repeat(40),"a".repeat(39)),
+                valid.replace("a".repeat(40),"g".repeat(40)),
+                valid.replaceAll("(?m)^ARTIFACT_SHA256=.*$","ARTIFACT_SHA256="+"b".repeat(63)),
+                valid.replaceAll("(?m)^ARTIFACT_SHA256=.*$","ARTIFACT_SHA256="+"b".repeat(64)),
+                valid.replace("2026-09-10T09:59:10Z","2026-09-10T09:59:10+08:00"),
+                valid.replace("2026-09-10T09:59:10Z","2026-02-30T09:59:10Z"),
+                valid.replace("2026-09-10T09:59:10Z","2025-02-29T09:59:10Z"),
+                valid.replace("2026-09-10T09:59:10Z","2026-09-10T24:59:10Z"),
+                valid.replace("2026-09-10T09:59:10Z","2026-09-10 09:59:10"),
+                valid.replaceAll("(?m)^DEPLOYED_AT=.*\\n?",""),
+                valid+"MERGED_MAIN_SHA="+"a".repeat(40)+"\n",
+                valid+"UNKNOWN=value\n", valid+"\n", valid.replace("\n","\r\n"))) {
+            replaceDeploymentMetadata(fixture,malformed);
+            Result denied=run("asset-card-runtime-install.sh",fixture);
+            assertThat(denied.code()).as("Invalid deployment metadata must fail closed").isNotZero();
+            assertThat(denied.output()).contains("RELEASE_METADATA_INVALID");
+            assertThat(fixture.root().resolve("etc/systemd/system/rine-logic.service.d/40-asset-card.conf")).doesNotExist();
+        }
+        replaceDeploymentMetadata(fixture,valid.replace("2026-09-10T09:59:10Z","2024-02-29T23:59:59Z"));
+        assertThat(run("asset-card-runtime-install.sh",fixture).code()).isZero();
+    }
+
+    @Test void deploymentMetadataMustResolveBesideTheSameProtectedReleaseJar() throws Exception {
+        Fixture fixture=fixture();
+        Path current=fixture.root().resolve("opt/rine-logic/current");
+        Path release=fixture.root().resolve("opt/rine-logic/releases/test-release");
+        Files.createDirectories(release.getParent()); Files.move(current,release);
+        Files.createSymbolicLink(current,Path.of("releases/test-release"));
+        Result accepted=run("asset-card-runtime-install.sh",fixture);
+        assertThat(accepted.code()).withFailMessage(accepted.output()).isZero();
+        Path metadata=release.resolve("deployment-metadata.txt");
+        Path outside=fixture.root().resolve("outside-metadata.txt");
+        Files.move(metadata,outside); Files.createSymbolicLink(metadata,outside);
+        Result denied=run("asset-card-runtime-install.sh",fixture);
+        assertThat(denied.code()).isNotZero();
+        assertThat(denied.output()).contains("SYMLINK_FORBIDDEN");
     }
 
     @Test void fakeRootCannotReadAnOutsideManifestOrAnUnprotectedManifest() throws Exception {
@@ -385,6 +430,9 @@ class NativeStagingAssetCardInfrastructureContractTest {
             System.out.println("ASSET_CARD_CREDENTIAL_RUNTIME_MODE=COMPILED_CLASSES_NOT_JAR_EVIDENCE");
         }
         write(fixture.root().resolve("usr/bin/java"),wrapper,"rwx------");
+        String metadata=Files.readString(fixture.root().resolve("opt/rine-logic/current/deployment-metadata.txt"))
+                .replaceAll("(?m)^ARTIFACT_SHA256=.*$","ARTIFACT_SHA256="+sha(jar));
+        replaceDeploymentMetadata(fixture,metadata);
         String manifest=Files.readString(fixture.manifest()).replace("WRITER_JDBC_URL=jdbc:postgresql://127.0.0.1:1/test","WRITER_JDBC_URL="+jdbcUrl)
                 .replaceAll("(?m)^APP_JAR_SHA256=.*$","APP_JAR_SHA256="+sha(jar));
         Files.writeString(fixture.manifest(),manifest);
@@ -441,8 +489,10 @@ class NativeStagingAssetCardInfrastructureContractTest {
         Files.setPosixFilePermissions(root,PosixFilePermissions.fromString("rwx------"));
         write(root.resolve(".asset-card-test-root"),"TEST_FIXTURE_ONLY\n","rw-------");
         String[] paths={"etc/systemd/system/rine-logic.service","etc/systemd/system/rine-logic.service.d/20-core-loop-schedulers.conf",
-                "usr/local/sbin/rine-logic-wait-ready","opt/rine-logic/current/app.jar","opt/rine-logic/release-metadata.json"};
+                "usr/local/sbin/rine-logic-wait-ready","opt/rine-logic/current/app.jar","opt/rine-logic/current/deployment-metadata.txt"};
         for(String path:paths) write(root.resolve(path),"SYNTHETIC_NON_SECRET_BASE\n","rw-r--r--");
+        write(root.resolve(paths[4]),"MERGED_MAIN_SHA="+"a".repeat(40)+"\nARTIFACT_SHA256="+sha(root.resolve(paths[3]))
+                +"\nDEPLOYED_AT=2026-09-10T09:59:10Z\n","rw-r--r--");
         write(root.resolve("etc/rine-logic/credentials/asset-card-db-password"),"SYNTHETIC_PASSWORD_SENTINEL","rw-------");
         write(root.resolve("usr/bin/java"),"#!/bin/sh\nprintf '%s\\n' ASSET_CARD_WRITER_VERIFY=FAIL VERIFIED_BUNDLE_STATUS=FAIL\nexit 2\n","rwx------");
         Files.createDirectories(root.resolve("opt/rine-logic/models/asset-card"));
@@ -455,10 +505,16 @@ class NativeStagingAssetCardInfrastructureContractTest {
                 .replace("REPLACE_SCHEDULER_SHA256",sha(root.resolve(paths[1])))
                 .replace("REPLACE_READY_SHA256",sha(root.resolve(paths[2])))
                 .replace("REPLACE_RELEASE_METADATA_SHA256",sha(root.resolve(paths[4])))
-                .replace("REPLACE_RELEASE_METADATA_FORMAT","JSON_V1")
+                .replace("REPLACE_RELEASE_METADATA_FORMAT","KEY_VALUE_V1")
                 .replace("REPLACE_DATABASE_NAME","test").replace("REPLACE_NON_SECRET_JDBC_URL","jdbc:postgresql://127.0.0.1:1/test");
         Path manifest=root.resolve("runtime.manifest"); write(manifest,template,"rw-------");
         return new Fixture(root,manifest);
+    }
+    private void replaceDeploymentMetadata(Fixture fixture,String content) throws Exception {
+        Path metadata=fixture.root().resolve("opt/rine-logic/current/deployment-metadata.txt");
+        Files.writeString(metadata,content);
+        Files.writeString(fixture.manifest(),Files.readString(fixture.manifest())
+                .replaceAll("(?m)^RELEASE_METADATA_SHA256=.*$","RELEASE_METADATA_SHA256="+sha(metadata)));
     }
     private Path modelFixture(Fixture fixture,String identity) throws Exception {
         Path directory=fixture.root().resolve("fixture-model-"+identity);

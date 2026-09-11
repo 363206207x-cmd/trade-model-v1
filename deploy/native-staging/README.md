@@ -41,11 +41,18 @@ Copy `asset-card-runtime-manifest.template` to an independently reviewed,
 root-owned non-secret identity document outside Git. The parser accepts exact
 known `KEY=VALUE` fields only, not shell syntax, duplicate fields or placeholders.
 Use actual reviewed SHA-256 values for the main unit, scheduler drop-in,
-readiness script, application JAR and release metadata. The only source-supported
-metadata candidate is `/opt/rine-logic/release-metadata.json` with `JSON_V1` format.
-Its actual path/format has not been verified: real acceptance is blocked until
-independent base-chain evidence proves that exact non-secret identity. A mismatch
-stops; never point the manifest at an arbitrary file or infer/rewrite that release
+readiness script, application JAR and release metadata. The independently observed
+native path is `/opt/rine-logic/current/deployment-metadata.txt`; select
+`RELEASE_METADATA_FORMAT=KEY_VALUE_V1`. It contains exactly `MERGED_MAIN_SHA`
+(40 lowercase hexadecimal characters), `ARTIFACT_SHA256` (64 lowercase hexadecimal
+characters, equal to the verified JAR hash), and `DEPLOYED_AT` (a valid UTC instant
+in `YYYY-MM-DDTHH:mm:ssZ` format). The file is parsed as data, never sourced;
+duplicate, missing, additional or malformed fields fail closed. Its separately
+reviewed SHA binds the full text. Metadata and JAR must resolve beside each other
+in the same protected release directory, including when the external `current`
+pointer is a symlink. Observed server hashes are not built-in defaults: each
+release still requires independent exact identity checks. A mismatch stops;
+never redirect the manifest to another file or rewrite the external release
 contract. Numeric service UID
 must differ from the root file-owner UID. Never put passwords, tokens, host keys,
 credential hashes, active.env/ai.env contents or environment dumps in this file.

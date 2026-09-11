@@ -93,9 +93,8 @@ native_init() {
   [[ "$ROOT_UID" =~ ^[0-9]+$ && "$SERVICE_UID" =~ ^[0-9]+$ && "$SERVICE_UID" != "$ROOT_UID" ]] || native_fail OWNER_INVALID
   [[ "$EXPECTED_DATABASE" =~ ^[A-Za-z0-9_]+$ && "$WRITER_JDBC_URL" =~ ^jdbc:postgresql://[A-Za-z0-9.:-]+/[A-Za-z0-9_]+$ ]] || native_fail DATABASE_IDENTITY_INVALID
   [[ "$WRITER_JDBC_URL" = */"$EXPECTED_DATABASE" && "$RELEASE_METADATA_FORMAT" =~ ^[A-Z0-9_]+$ ]] || native_fail DATABASE_IDENTITY_INVALID
-  # This source supports only this non-secret candidate identity. Its actual deployment
-  # identity still requires independent evidence; never probe/hash an arbitrary path.
-  [[ "$RELEASE_METADATA" = /opt/rine-logic/release-metadata.json && "$RELEASE_METADATA_FORMAT" = JSON_V1 ]] || native_fail RELEASE_METADATA_INVALID
+  # Bind the independently observed native release format, never an arbitrary file.
+  [[ "$RELEASE_METADATA" = /opt/rine-logic/current/deployment-metadata.txt && "$RELEASE_METADATA_FORMAT" = KEY_VALUE_V1 ]] || native_fail RELEASE_METADATA_INVALID
   for key in APP_JAR_SHA256 MAIN_UNIT_SHA256 SCHEDULER_DROPIN_SHA256 READY_SCRIPT_SHA256 RELEASE_METADATA_SHA256; do
     value=${!key}; [[ "$value" =~ ^[0-9a-f]{64}$ ]] || native_fail MANIFEST_INVALID
   done
@@ -107,9 +106,33 @@ native_init() {
   fi
   native_meta "$NATIVE_MANIFEST" "$ROOT_UID" 022
 }
+native_deployment_metadata() {
+  local path="$1" line key value seen='|' merged= artifact= deployed= year month day last_day=31
+  [[ $(native_size "$path") -le 512 ]] || native_fail RELEASE_METADATA_INVALID
+  [[ $(LC_ALL=C tr -d '\012\040-\176' < "$path" | wc -c | tr -d '[:space:]') = 0 ]] || native_fail RELEASE_METADATA_INVALID
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == *=* ]] || native_fail RELEASE_METADATA_INVALID
+    key=${line%%=*}; value=${line#*=}
+    [[ "$seen" != *"|$key|"* ]] || native_fail RELEASE_METADATA_INVALID
+    seen="$seen$key|"
+    case "$key" in
+      MERGED_MAIN_SHA) [[ "$value" =~ ^[0-9a-f]{40}$ ]] || native_fail RELEASE_METADATA_INVALID; merged=$value;;
+      ARTIFACT_SHA256) [[ "$value" =~ ^[0-9a-f]{64}$ && "$value" = "$APP_JAR_SHA256" ]] || native_fail RELEASE_METADATA_INVALID; artifact=$value;;
+      DEPLOYED_AT) deployed=$value;;
+      *) native_fail RELEASE_METADATA_INVALID;;
+    esac
+  done < "$path"
+  [[ -n "$merged" && -n "$artifact" && "$deployed" =~ ^([0-9]{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$ ]] || native_fail RELEASE_METADATA_INVALID
+  year=$((10#${BASH_REMATCH[1]})); month=$((10#${BASH_REMATCH[2]})); day=$((10#${BASH_REMATCH[3]}))
+  case "$month" in
+    4|6|9|11) last_day=30;;
+    2) last_day=28; if (( year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) )); then last_day=29; fi;;
+  esac
+  (( year > 0 && day <= last_day )) || native_fail RELEASE_METADATA_INVALID
+}
 native_base_checks() {
   local pair path expected actual parent
-  for pair in "$MAIN_UNIT|$MAIN_UNIT_SHA256" "$SCHEDULER_DROPIN|$SCHEDULER_DROPIN_SHA256" "$READY_SCRIPT|$READY_SCRIPT_SHA256" "$RELEASE_METADATA|$RELEASE_METADATA_SHA256"; do
+  for pair in "$MAIN_UNIT|$MAIN_UNIT_SHA256" "$SCHEDULER_DROPIN|$SCHEDULER_DROPIN_SHA256" "$READY_SCRIPT|$READY_SCRIPT_SHA256"; do
     path=$(native_path "${pair%%|*}"); expected=${pair#*|}
     native_meta "$path" "$ROOT_UID" 022
     [[ -f "$path" && "$(native_sha "$path")" = "$expected" ]] || native_fail BASE_IDENTITY_MISMATCH
@@ -122,6 +145,14 @@ native_base_checks() {
   native_meta "$actual" "$ROOT_UID" 022
   [[ "$(native_sha "$actual")" = "$APP_JAR_SHA256" ]] || native_fail JAR_IDENTITY_MISMATCH
   NATIVE_JAR=$actual
+  # A protected external current-directory symlink is allowed only when both
+  # files resolve beside each other in the same root-owned release directory.
+  path=$(native_path "$RELEASE_METADATA"); [[ -f "$path" ]] || native_fail RELEASE_METADATA_INVALID
+  actual=$(cd "$(dirname "$path")" && pwd -P)/$(basename "$path")
+  [[ "$(dirname "$actual")" = "$(dirname "$NATIVE_JAR")" ]] || native_fail RELEASE_METADATA_INVALID
+  native_meta "$actual" "$ROOT_UID" 022
+  [[ "$(native_sha "$actual")" = "$RELEASE_METADATA_SHA256" ]] || native_fail BASE_IDENTITY_MISMATCH
+  native_deployment_metadata "$actual"
   for parent in "$(native_path "$MODEL_ROOT")" "$(native_path "$(dirname "$CARD_DROPIN")")" "$(native_path "$(dirname "$CREDENTIAL_SOURCE")")"; do
     native_meta "$parent" "$ROOT_UID" 022
   done
