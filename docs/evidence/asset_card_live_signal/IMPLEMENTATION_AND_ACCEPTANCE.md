@@ -107,11 +107,45 @@ not hand-written. Review refused a proposed Maven `clean` invocation before it
 started; no clean/delete workaround ran. The reviewer-approved non-clean test
 command was used instead and prior build evidence was preserved.
 
-Clean candidate packaging, standard-JAR credential verification, Linux x86_64
-native rerun and final exact-head CI follow this source checkpoint. Until their
-individual results are recorded, local integration phase completion remains
-pending. Real training/calibration/test samples and Brier/ECE/LogLoss remain
-NOT_AVAILABLE; MODEL_MODE=SHADOW and PRODUCTION_MODEL_READY=NO.
+### Candidate standard-JAR verification: local PASS
+
+Clean source checkpoint: `338bdd5b535ccba281de56512dd78f3a7026997f`.
+Standard JAR SHA-256: `90b95e31ca680aa22e1ec669cf920c587e0cc4a3812528a406ca9c9720dec15c`.
+The existing profile generated the actual full revision and `git.dirty=false`.
+
+- Standard-JAR credential mode: **13 infrastructure tests / 0 failures / 0 errors /
+  0 skips**, exit 0. The actual PropertiesLauncher invokes the candidate's verifier
+  with fresh disposable PostgreSQL connections, not a replacement authentication
+  program. Current main/nested class bytes and embedded Git identity are checked
+  against the compiled source before invocation. Log
+  `/private/tmp/v42-writer-candidate-jar-credentials.log`, SHA-256
+  `a5f8c2ee65fdec442dff5d7d6759c28b5b5558681b93ee7ce479e2a2aa701f95`.
+- The same standard JAR actually passed the native matrix in isolated Linux x86_64,
+  Java 17, non-root/no-network/read-only JAR and model mounts. The existing immutable
+  image index `sha256:1bef21f732b9d96a66e7b6fce36f3ddd77a7081730ef7e6038d62e12596d7782`
+  and amd64 manifest `sha256:0d98c7c4ac8fdbd4143a3875675aabea1c7e38ac2c90addfd836ad9a64a2095c`
+  were reused; no dependencies were reinstalled. Its libgomp package is
+  `12.3.0-1ubuntu1~22.04.3`; actual `libgomp.so.1` and XGBoost 2.1.4 were loaded.
+- Both raw predictions and both independently parameterized Beta outputs had
+  maximum Java/Python error **0.0**, tolerance **1e-7**, over **3 float32 rows ×45
+  features**, `SPOT_CARD_FEATURES_V2_SIGNED_PIT`. LONG UBJ SHA-256:
+  `085a61c45b1f92fc0790788852c1ad6b7b9015e1f30b32f719869f6e4faebb13`;
+  SHORT: `b10e591d3ce9f2537da9d34f04fdf3254b2a2c0f6b390fdb01e00340f29d5fe0`.
+  These are temporary TEST_FIXTURE_ONLY models, automatically removed and never
+  used as qualified production bundles. Native log
+  `/private/tmp/v42-writer-candidate-native.log`, SHA-256
+  `585689528c1777df1841c543565b597327c7d358ff5a1de1989b058dd095a28e`, exit 0.
+- The clean real outer resolver returned AUTHORIZED, implementation true, count64
+  and block reason NONE. Business merge and deployment remain forbidden.
+
+This evidence-only follow-up does not change the tested source. The final pushed
+Head must be separately repackaged, its JAR credential/native checks rerun, and
+its exact-head CI recorded in PR #1295 before reporting this local integration
+phase complete. No earlier CI run is substituted. Real training/calibration/test
+samples, independent four-hour clusters and Brier/ECE/LogLoss remain NOT_AVAILABLE;
+MODEL_MODE=SHADOW, PRODUCTION_MODEL_READY=NO, ASSET_CARD_LIVE_READY=NO.
+Real server/systemd configuration, database permissions, credential/model installs,
+deployment and official-domain live acceptance remain NOT_EXECUTED.
 
 ## Native JAR continuation — partial local implementation, not runtime-ready (2026-09-11)
 
