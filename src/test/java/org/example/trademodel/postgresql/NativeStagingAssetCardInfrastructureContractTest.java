@@ -339,6 +339,39 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(applied.output()).contains("CARD_STARTUP_MODE=PREPARED", "RESTART_REQUIRED=YES", "SYSTEMD_CHANGE_EXECUTION=NO");
     }
 
+    @Test void ownerPreviewAttachmentIsExplicitSingleAccountAndNeverChangesModelOrWindowEligibility() throws Exception {
+        Fixture fixture=fixture();
+        String original=Files.readString(fixture.manifest());
+        // Adding this optional field also works with a pre-preview manifest.
+        String legacy=original.replaceAll("(?m)^OWNER_PREVIEW_USER_ID=.*\\n?", "");
+        Files.writeString(fixture.manifest(),legacy+"OWNER_PREVIEW_USER_ID=314159\n");
+        Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY");
+        assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+        String rendered=Files.readString(cardDropin(fixture));
+        assertThat(rendered).contains("Environment=\"TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS=314159\"")
+                .contains("MODEL_MODE=SHADOW", "ASSET_CARD_ENABLED=false", "WRITER_ENABLED=false", "EXTERNAL_CALLS_ENABLED=false")
+                .doesNotContain("CANARY", "ACTIVE", "COLLECTION_WINDOW_", "ExecStart=", "EnvironmentFile=");
+        assertThat(bindRenderedEnvironment(rendered).getOwnerPreviewUserIds()).containsExactly(314159L);
+        assertThat(applied.output()).contains("RESTART_REQUIRED=YES", "SYSTEMD_CHANGE_EXECUTION=NO");
+    }
+
+    @Test void ownerPreviewDefaultsEmptyAndRejectsMultipleNegativeOverflowOrInjectedAccounts() throws Exception {
+        Fixture fixture=fixture();
+        String legacy=Files.readString(fixture.manifest()).replaceAll("(?m)^OWNER_PREVIEW_USER_ID=.*\\n?", "");
+        Files.writeString(fixture.manifest(),legacy);
+        Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY");
+        assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+        assertThat(Files.readString(cardDropin(fixture))).contains("Environment=\"TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS=\"");
+        assertThat(bindRenderedEnvironment(Files.readString(cardDropin(fixture))).getOwnerPreviewUserIds()).isEmpty();
+        String installed=Files.readString(cardDropin(fixture));
+        for(String invalid:List.of("0","-1","314159,271828","9223372036854775808","ALL","314159 271828","314159\"")) {
+            Files.writeString(fixture.manifest(),legacy+"OWNER_PREVIEW_USER_ID="+invalid+"\n");
+            Result denied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY");
+            assertThat(denied.code()).as("Invalid Owner preview account must not broaden visibility").isNotZero();
+            assertThat(Files.readString(cardDropin(fixture))).isEqualTo(installed);
+        }
+    }
+
     @Test void armedAttachmentRequiresDistinctConfirmationAndBindsTheExactFiniteJavaPlan() throws Exception {
         Fixture fixture=armedFixture();
         String base=Files.readString(fixture.root().resolve("etc/systemd/system/rine-logic.service"));

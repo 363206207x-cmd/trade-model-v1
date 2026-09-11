@@ -53,6 +53,12 @@ public class AssetCardService implements AutoCloseable {
         Thread thread = new Thread(task, "asset-card-inference"); thread.setDaemon(true); return thread;
     });
     private final Map<String, AssetCardSnapshot> snapshots = new ConcurrentHashMap<>();
+    // Transport subscriptions only; never a market subscription, model task or position-monitor context.
+    private final Map<String, Long> cardStreamUsers = new ConcurrentHashMap<>();
+    private final Set<Long> freshCardUsers = ConcurrentHashMap.newKeySet();
+    private final Map<String, Object> pendingCardPublications = new ConcurrentHashMap<>();
+    private final Map<Long, Map<String, AssetCardSnapshot>> deliveredCardSnapshots = new ConcurrentHashMap<>();
+    private final Object cardDeliveryLock = new Object();
     private volatile boolean writerReady;
     private final Map<String, AssetCardMapper.TypedHistory> labelCursors = new ConcurrentHashMap<>();
     private final Map<String, String> labelStatuses = new ConcurrentHashMap<>();
@@ -680,6 +686,7 @@ public class AssetCardService implements AutoCloseable {
                 log.warn("[asset-card] Snapshot publication failed ({})", failure.getClass().getSimpleName());
             }
         }
+        flushPublications(at);
     }
 
     private void refreshPrice(String symbol, Instant at) {
@@ -783,23 +790,101 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void publish(AssetCardSnapshot snapshot, String type, Map<String, Object> values, Instant at) {
-        // Private computation/persistence above is never gated by the browser rollout cohort.
-        if (!usesCardSignalDisplay(snapshot.symbol())) return;
-        var visible = publicModelProjection(snapshot, at);
-        if ("ASSET_CARD_SIGNAL".equals(type)) { values.put("signal", visible.signal()); values.put("risk", visible.risk()); }
-        if ("ASSET_CARD_RISK".equals(type)) values.put("risk", visible.risk());
-        if ("ASSET_CARD_HEALTH".equals(type)) {
-            values.put("health", visible.health()); values.put("signal", visible.signal()); values.put("risk", visible.risk());
-        }
         dispatch(snapshot, type, values, at);
-        // A price/risk-only update must also revoke an already-rendered old percentage, at the same version.
-        if (visible != snapshot && !"ASSET_CARD_HEALTH".equals(type))
-            dispatch(snapshot, "ASSET_CARD_HEALTH", payload("health", visible.health(), "signal", visible.signal(), "risk", visible.risk()), at);
     }
 
     private void dispatch(AssetCardSnapshot snapshot, String type, Map<String, Object> values, Instant at) {
+        // Never retain a private/previous-model payload for later replay. Resolve current safety at delivery time.
+        if (!cardStreamUsers.isEmpty()) pendingCardPublications.put(snapshot.symbol(), new Object());
+    }
+
+    /** Called by the authenticated stream controller, not by Home reads or card selection. */
+    public String registerCardStream(Long userId) {
+        if (userId == null || userId <= 0) throw new IllegalArgumentException("Authenticated user required");
+        String token = UUID.randomUUID().toString();
+        cardStreamUsers.put(token, userId);
+        freshCardUsers.add(userId);
+        return token;
+    }
+
+    public void unregisterCardStream(String token) {
+        if (token == null) return;
+        Long userId = cardStreamUsers.remove(token);
+        if (userId != null && !cardStreamUsers.containsValue(userId)) {
+            freshCardUsers.remove(userId);
+            deliveredCardSnapshots.remove(userId);
+        }
+    }
+
+    /** One pool read per active user/batch. Permission failures emit nothing and are never cached as grants. */
+    void flushPublications(Instant at) {
+        if (!properties.isEnabled()) return;
+        synchronized (cardDeliveryLock) {
+            Set<String> changed = new HashSet<>();
+            pendingCardPublications.forEach((symbol, marker) -> {
+                changed.add(symbol); pendingCardPublications.remove(symbol, marker);
+            });
+            var safeSnapshots = new HashMap<String, AssetCardSnapshot>();
+            for (Long userId : Set.copyOf(cardStreamUsers.values())) {
+                if (!cardDeliveryEnabledForUser(userId)) { deliveredCardSnapshots.remove(userId); continue; }
+                try {
+                    var names = new LinkedHashMap<String, String>();
+                    for (var member : pool.listForUser(userId)) names.put(normalize(member.symbol()), member.displayName());
+                    if (!cardStreamUsers.containsValue(userId)) continue;
+                    var previous = deliveredCardSnapshots.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>());
+                    previous.keySet().removeIf(symbol -> !names.containsKey(symbol) || !usesCardSignalDisplay(userId, symbol));
+                    boolean fresh = freshCardUsers.remove(userId);
+                    var requested = new HashSet<>(changed); requested.addAll(previous.keySet());
+                    if (fresh) requested.addAll(names.keySet());
+                    for (String symbol : requested) {
+                        if (!names.containsKey(symbol) || !usesCardSignalDisplay(userId, symbol)
+                                || !cardStreamUsers.containsValue(userId)) continue;
+                        var safe = safeSnapshots.computeIfAbsent(symbol, key -> {
+                            try (var lease = modelRegistry.acquire(key)) { return snapshot(key, key, at, lease.bundle()); }
+                        });
+                        var current = previewProjection(userId, safe);
+                        sendCurrentCardFields(userId, current, previous.get(symbol), fresh, at);
+                        previous.put(symbol, current);
+                    }
+                    if (!cardStreamUsers.containsValue(userId)) deliveredCardSnapshots.remove(userId, previous);
+                } catch (RuntimeException failure) {
+                    // No fallback to union membership or a previous permission result.
+                    log.warn("[asset-card] Authenticated card delivery unavailable ({})", failure.getClass().getSimpleName());
+                }
+            }
+        }
+    }
+
+    private void sendCurrentCardFields(Long userId, AssetCardSnapshot current, AssetCardSnapshot previous, boolean fresh, Instant at) {
+        boolean first = fresh || previous == null;
+        if (current.priceTradeId() != null && current.priceTradeId() > 0 && current.spotPrice() != null
+                && current.latestPriceAt() != null && (first || !Objects.equals(current.priceTradeId(), previous.priceTradeId())
+                || !Objects.equals(current.latestPriceAt(), previous.latestPriceAt())))
+            sendCardToUser(userId, current, "ASSET_CARD_PRICE", payload("spotPrice", current.spotPrice(),
+                    "latestPriceAt", current.latestPriceAt(), "priceTradeId", current.priceTradeId()), at);
+        boolean identityChanged = first || !Objects.equals(current.featureVersion(), previous.featureVersion())
+                || !Objects.equals(current.modelVersion(), previous.modelVersion())
+                || !Objects.equals(current.calibrationVersion(), previous.calibrationVersion())
+                || !Objects.equals(current.thresholdVersion(), previous.thresholdVersion());
+        if (identityChanged || !Objects.equals(current.signal(), previous.signal()))
+            sendCardToUser(userId, current, "ASSET_CARD_SIGNAL", payload("signal", current.signal(), "risk", current.risk(), "cardAsOf", current.cardAsOf()), at);
+        if (identityChanged || !sameEffectiveRisk(current.risk(), previous.risk()))
+            sendCardToUser(userId, current, "ASSET_CARD_RISK", payload("risk", current.risk(), "cardAsOf", current.cardAsOf()), at);
+        if (first || !sameEffectiveHealth(current.health(), previous.health()))
+            sendCardToUser(userId, current, "ASSET_CARD_HEALTH", payload("health", current.health(),
+                    "signal", current.signal(), "risk", current.risk()), at);
+    }
+
+    private static boolean sameEffectiveHealth(AssetCardSnapshot.Health a, AssetCardSnapshot.Health b) {
+        return a == b || a != null && b != null && Objects.equals(a.status(), b.status()) && Objects.equals(a.reason(), b.reason());
+    }
+
+    private void sendCardToUser(Long userId, AssetCardSnapshot snapshot, String type, Map<String, Object> values, Instant at) {
+        if (!cardStreamUsers.containsValue(userId) || !usesCardSignalDisplay(userId, snapshot.symbol())) return;
+        long transportVersion = "ASSET_CARD_PRICE".equals(type) ? snapshot.priceTradeId() : Math.max(1, snapshot.snapshotVersion());
         values.put("symbol", snapshot.symbol());
         values.put("snapshotVersion", snapshot.snapshotVersion());
+        values.put("transportVersion", transportVersion);
         values.put("featureVersion", snapshot.featureVersion());
         values.put("modelVersion", snapshot.modelVersion());
         values.put("calibrationVersion", snapshot.calibrationVersion());
@@ -809,8 +894,8 @@ public class AssetCardService implements AutoCloseable {
         values.put("riskBasisSide", boundRisk.riskBasisSide());
         values.put("riskBasisDirection", boundRisk.riskBasisDirection());
         values.put("riskBasisSignalAsOf", boundRisk.riskBasisSignalAsOf());
-        events.publish(new DashboardLiveEvent(type + ":" + snapshot.symbol() + ":" + snapshot.snapshotVersion(), type,
-                snapshot.symbol(), snapshot.snapshotVersion(), at, at, values));
+        events.publishToUser(userId, new DashboardLiveEvent(type + ":" + snapshot.symbol() + ":" + transportVersion, type,
+                snapshot.symbol(), transportVersion, at, at, values));
     }
 
     private static Map<String, Object> payload(Object... pairs) {
@@ -844,7 +929,7 @@ public class AssetCardService implements AutoCloseable {
             signal = signal.direction() != null ? signal.invalidated() : signal;
             risk = sourceLostRisk(signal, risk, now, model);
             health = new AssetCardSnapshot.Health("SOURCE_UNAVAILABLE", "真实现货成交价格尚未就绪或已过期", now);
-        } else {
+        } else if (health == null || !"MODEL_UNAVAILABLE".equals(health.status()) && !"SOURCE_UNAVAILABLE".equals(health.status())) {
             // Risk, model, storage and recovery faults never become a PRICE source failure.
             String riskFailure = failure(Field.RISK, normalized);
             if (riskFailure != null) risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), riskFailure);
@@ -852,9 +937,13 @@ public class AssetCardService implements AutoCloseable {
             if (signalFailure != null) {
                 signal = new AssetCardSnapshot.Signal(signal.direction(), "FAILED", null, null, null,
                         signal.oneHourState(), signal.fourHourTrend(), signal.signalAsOf());
-                health = new AssetCardSnapshot.Health("SIGNAL_FAILED", signalFailure, now);
             }
-            if (failure(Field.PERSISTENCE, normalized) != null)
+            if (signalFailure != null || riskFailure != null) {
+                String status = signalFailure == null ? "RISK_UNAVAILABLE"
+                        : riskFailure == null ? "SIGNAL_FAILED" : "SIGNAL_AND_RISK_UNAVAILABLE";
+                health = new AssetCardSnapshot.Health(status, signalFailure == null ? riskFailure
+                        : riskFailure == null ? signalFailure : signalFailure + "；" + riskFailure, now);
+            } else if (failure(Field.PERSISTENCE, normalized) != null)
                 health = new AssetCardSnapshot.Health("PERSISTENCE_UNAVAILABLE", failure(Field.PERSISTENCE, normalized), now);
         }
         return new AssetCardSnapshot(normalized, name, priceMissing ? null : currentPrice, priceMissing ? null : currentPriceAt, signal, risk,
@@ -926,8 +1015,56 @@ public class AssetCardService implements AutoCloseable {
             String normalized = normalize(symbol);
             if (!names.containsKey(normalized) || !symbols.add(normalized)) throw new IllegalArgumentException("Invalid displayed card selection");
         }
-        return symbols.stream().filter(this::usesCardSignalDisplay)
-                .map(symbol -> snapshot(symbol, names.get(symbol))).toList();
+        return symbols.stream().filter(symbol -> usesCardSignalDisplay(userId, symbol))
+                .map(symbol -> snapshotForUser(userId, symbol, names.get(symbol))).toList();
+    }
+
+    /** Home has already resolved its authorized membership; this method performs no registration or writes. */
+    public AssetCardSnapshot snapshotForUser(Long userId, String symbol, String name) {
+        if (!usesCardSignalDisplay(userId, symbol)) throw new IllegalArgumentException("Card display is not enabled for this session");
+        return previewProjection(userId, snapshot(symbol, name));
+    }
+
+    private boolean ownerShadowPreview(Long userId) {
+        return userId != null && userId > 0 && properties.isEnabled()
+                && properties.getModelMode() == AssetCardProperties.ModelMode.SHADOW
+                && properties.getOwnerPreviewUserIds().contains(userId);
+    }
+
+    private boolean cardDeliveryEnabledForUser(Long userId) {
+        return properties.isEnabled() && (ownerShadowPreview(userId)
+                || properties.getModelMode() == AssetCardProperties.ModelMode.ACTIVE
+                || properties.getModelMode() == AssetCardProperties.ModelMode.CANARY);
+    }
+
+    public boolean usesCardSignalDisplay(Long userId, String symbol) {
+        if (userId == null || userId <= 0 || symbol == null) return false;
+        try { normalize(symbol); } catch (IllegalArgumentException invalid) { return false; }
+        return usesCardSignalDisplay(symbol) || ownerShadowPreview(userId);
+    }
+
+    private AssetCardSnapshot previewProjection(Long userId, AssetCardSnapshot value) {
+        if (!ownerShadowPreview(userId)) return value;
+        var original = value.signal();
+        var hidden = new AssetCardSnapshot.Signal(null, "FAILED".equals(original.status()) ? "FAILED" : "SHADOW", null, null, null,
+                original.oneHourState(), original.fourHourTrend(), original.signalAsOf());
+        var risk = value.risk();
+        if (!risk.matchesBasis(hidden)) {
+            // Old directional risk cannot follow a hidden/changed side. Only independently assessed DATA survives.
+            var unknown = AssetCardSnapshot.Risk.unknownFor(hidden, risk.riskVersion(), "影子展示没有可验证的方向风险依据");
+            var items = new ArrayList<>(unknown.items());
+            var data = risk.items().stream().filter(item -> "DATA".equals(item.type()) && "ASSESSED".equals(item.assessmentStatus())).findFirst();
+            String overall = null;
+            if (data.isPresent()) {
+                items.removeIf(item -> "DATA".equals(item.type())); items.add(data.get());
+                if (Set.of("HIGH", "MEDIUM").contains(String.valueOf(data.get().level()))) overall = data.get().level();
+            }
+            risk = new AssetCardSnapshot.Risk(overall, items, risk.riskAsOf(), AssetCardSnapshot.SignalSide.NON_DIRECTIONAL,
+                    null, hidden.signalAsOf(), risk.riskMarketAsOf(), risk.riskVersion());
+        }
+        return new AssetCardSnapshot(value.symbol(), value.assetName(), value.spotPrice(), value.latestPriceAt(), hidden, risk,
+                value.health(), value.cardAsOf(), value.snapshotVersion(), value.featureVersion(), value.modelVersion(),
+                value.calibrationVersion(), value.thresholdVersion(), value.priceTradeId());
     }
 
     /** Rollout cohort only: absent/invalid models stay on the new fail-closed projection, never legacy. */
@@ -1417,5 +1554,5 @@ public class AssetCardService implements AutoCloseable {
         if (!value.matches("[A-Z0-9]{2,32}")) throw new IllegalArgumentException("Invalid card symbol");
         return value;
     }
-    @PreDestroy public void close() { started = false; background.shutdownNow(); inference.shutdownNow(); riskWorkers.shutdownNow(); labelWorker.shutdownNow(); modelRegistry.close(); }
+    @PreDestroy public void close() { started = false; background.shutdownNow(); inference.shutdownNow(); riskWorkers.shutdownNow(); labelWorker.shutdownNow(); modelRegistry.close(); cardStreamUsers.clear(); freshCardUsers.clear(); pendingCardPublications.clear(); deliveredCardSnapshots.clear(); }
 }

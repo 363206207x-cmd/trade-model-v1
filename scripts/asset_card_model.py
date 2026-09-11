@@ -912,6 +912,39 @@ def write_json(path,value):
     path.write_text(json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False,default=json_default)+"\n")
 
 
+def validate_split_times(splits):
+    if not isinstance(splits,list) or len(splits)!=4: raise ValueError("Four independent split clocks required")
+    previous_available=None
+    for name,split in zip(("TRAIN","CALIBRATION","VALIDATION","TEST"),splits):
+        if split.get("name")!=name: raise ValueError("Invalid split order")
+        start,end,horizon,available=(timestamp(split[key]) for key in ("start","end","labelEnd","labelAvailableAt"))
+        if available<horizon: raise ValueError("Label availability precedes fixed horizon")
+        if start>end or end+HORIZON>horizon or previous_available is not None and start<previous_available+HORIZON:
+            raise ValueError("Temporal leakage or missing four-hour embargo")
+        previous_available=available
+
+
+def build_lifecycle(manifest,report,train,checked_at=None):
+    """Use actual label availability, never the earlier fixed outcome horizon, as the model cutoff."""
+    validate_split_times(report["splits"])
+    policy=manifest["releasePolicy"]
+    trained=timestamp(report["splits"][1]["labelAvailableAt"])
+    validated=timestamp(report["splits"][3]["labelAvailableAt"])
+    expires=timestamp(manifest["validUntil"])
+    checked=timestamp(datetime.now(timezone.utc).isoformat()) if checked_at is None else timestamp(checked_at)
+    if trained>validated or expires<=validated or checked<validated or checked>=expires:
+        raise ValueError("Model lifecycle is not yet validated or has expired")
+    def train_quantile(values,q):
+        if not values: return None
+        values=sorted(values); x=(len(values)-1)*q; lo=math.floor(x); hi=math.ceil(x)
+        return values[lo]+(values[hi]-values[lo])*(x-lo)
+    return {"dataVersion":manifest["provenance"]["datasetVersion"],"riskVersion":policy["riskVersion"],
+            "trainedThrough":instant(trained),"validatedThrough":instant(validated),"validUntil":instant(expires),
+            "missingPatterns":sorted(report["patternMetrics"]),"maxFeatureOutlierFraction":policy["maxFeatureOutlierFraction"],
+            "featureLower":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftLowerQuantile"]) for i in range(len(FEATURE_NAMES))],
+            "featureUpper":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftUpperQuantile"]) for i in range(len(FEATURE_NAMES))]}
+
+
 def train_bundle(manifest,rows,excluded,output):
     validate_training_manifest(manifest)
     policy=manifest["releasePolicy"]; validate_policy(policy)
@@ -933,17 +966,8 @@ def train_bundle(manifest,rows,excluded,output):
     required_sides={"LONG","SHORT","NON_DIRECTIONAL"}
     risk_complete=(set(policy["riskMetrics"])==required_sides and all(policy["riskMetrics"][s] for s in required_sides)
                    and all(set(distributions.get(asset,{}))==required_sides and all(set(distributions[asset][s])==set(policy["riskMetrics"][s]) for s in required_sides) for asset in policy["requiredAssets"]))
-    def train_quantile(values,q):
-        if not values: return None
-        values=sorted(values); x=(len(values)-1)*q; lo=math.floor(x); hi=math.ceil(x)
-        return values[lo]+(values[hi]-values[lo])*(x-lo)
     train=parts[0]
-    lifecycle={"dataVersion":manifest["provenance"]["datasetVersion"],"riskVersion":policy["riskVersion"],
-               "trainedThrough":report["splits"][1]["labelAvailableAt"],"validatedThrough":report["splits"][3]["labelAvailableAt"],"validUntil":manifest["validUntil"],
-               "missingPatterns":sorted(report["patternMetrics"]),"maxFeatureOutlierFraction":policy["maxFeatureOutlierFraction"],
-               "featureLower":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftLowerQuantile"]) for i in range(len(FEATURE_NAMES))],
-               "featureUpper":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftUpperQuantile"]) for i in range(len(FEATURE_NAMES))]}
-    if timestamp(lifecycle["validUntil"])<=timestamp(lifecycle["validatedThrough"]): raise ValueError("Bundle expires before independent validation is complete")
+    lifecycle=build_lifecycle(manifest,report,train)
     out=pathlib.Path(output)
     if out.exists(): raise ValueError("Atomic bundle output must be a new directory; refusing overwrite")
     out.mkdir(parents=True)
@@ -962,7 +986,8 @@ def train_bundle(manifest,rows,excluded,output):
                              asset_card_feature_version=FEATURE_VERSION,asset_card_calibration_version=manifest["calibrationVersion"],
                              asset_card_threshold_version=manifest["thresholdVersion"],asset_card_data_kind="REAL_HISTORICAL",
                              asset_card_dataset_version=manifest["provenance"]["datasetVersion"],asset_card_risk_version=policy["riskVersion"],
-                             asset_card_trained_through=lifecycle["trainedThrough"],asset_card_valid_until=lifecycle["validUntil"])
+                             asset_card_trained_through=lifecycle["trainedThrough"],asset_card_validated_through=lifecycle["validatedThrough"],
+                             asset_card_valid_until=lifecycle["validUntil"])
         models[side].save_model(out/(side.lower()+".ubj"))
     write_json(out/"calibration.json",calibrators)
     write_json(out/"thresholds.json",thresholds)

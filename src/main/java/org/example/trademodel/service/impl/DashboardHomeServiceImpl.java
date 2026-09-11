@@ -521,9 +521,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         });
         // Read only after canonical membership/ranking has completed. Card signals cannot influence it.
         home.getAssets().forEach(asset -> {
-            boolean displayEnabled = assetCardService != null && assetCardService.usesCardSignalDisplay(asset.getRawSymbol());
+            boolean displayEnabled = assetCardService != null && assetCardService.usesCardSignalDisplay(userId, asset.getRawSymbol());
             asset.setCardSignalDisplayEnabled(displayEnabled);
-            asset.setCardSignal(displayEnabled ? assetCardService.snapshot(asset.getRawSymbol(), asset.getName()) : null);
+            asset.setCardSignal(displayEnabled ? assetCardService.snapshotForUser(userId, asset.getRawSymbol(), asset.getName()) : null);
         });
         home.setSnapshotComplete(true);
     }

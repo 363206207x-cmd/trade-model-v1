@@ -25,6 +25,9 @@ EXPECTED_DATABASE=REPLACE_DATABASE_NAME
 WRITER_ROLE=rine_asset_card_writer
 MODEL_MODE=SHADOW
 PRODUCTION_MODEL_READY=NO
+# Optional single authenticated account, selected from verified Session identity.
+# Visibility only: does not activate models or grant a collection window.
+OWNER_PREVIEW_USER_ID=NONE
 # PREPARED keeps all card switches off. ARMED is a separately approved, fixed allowance.
 CARD_STARTUP_MODE=PREPARED
 COLLECTION_WINDOW_ID=NOT_CONFIGURED

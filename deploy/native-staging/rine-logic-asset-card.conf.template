@@ -3,6 +3,7 @@
 LoadCredential=asset-card-db-password:/etc/rine-logic/credentials/asset-card-db-password
 ReadOnlyPaths=/opt/rine-logic/models/asset-card
 Environment="TRADE_MODEL_ASSET_CARD_MODEL_MODE=SHADOW"
+Environment="TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS=@OWNER_PREVIEW_USER_IDS@"
 Environment="TRADE_MODEL_ASSET_CARD_ENABLED=@CARD_ENABLED@"
 Environment="TRADE_MODEL_ASSET_CARD_EXTERNAL_CALLS_ENABLED=@CARD_ENABLED@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_ENABLED=@CARD_ENABLED@"

@@ -1,5 +1,179 @@
 # Asset-card live signal implementation evidence
 
+## V42 startup recovery and retained correctness fixes — 2026-09-11
+
+This section records execution under the Owner's **one additional card-disabled
+startup** approval, not a new collection allowance. Historical reports below
+remain unchanged. The running release and the subsequent source correction are
+different identities; a new source Head is not deployed by this approval.
+
+### Actual controlled recovery
+
+- Running merged main: `8d77902da7a66f26559a92a9646d99952f89e9b8`.
+  Standard JAR SHA-256:
+  `da5380a3034dd58369adf26a1b78adc7bd76b7c47ec25a0dc565cd9392a53304`.
+  The candidate, uploaded and running bytes agree. Rollback remains exact
+  `094b70a8ed31891999da0814fae5add09e2c4e08`, JAR SHA-256
+  `b9e49308b0ce84e3d2033a07a571d009d8d1483b5770010fd7c74555dba0105b`.
+- Prior attempt returned HTTP200 during `activating/start-post` and was wrongly
+  rejected by an immediate `is-active` assertion. The corrected temporary
+  controller is `/private/tmp/v42-startup-recovery-8d77902d.sh`; its exact diff
+  against the previous controller is `/private/tmp/v42-startup-recovery-8d77902d.diff`.
+  Controller SHA-256: `1cf6b2666d2d03535a56c2e2ee67f70b2a30a4b580765e9ccb2ed91b41c7ffc5`.
+  This is a release-control artifact, not a hidden repository/business change.
+- Fifteen local wait-state tests passed before execution. The existing unit's
+  270-second startup timeout, `ExecStartPost` and exit semantics are unchanged;
+  the controller has a finite 280-second observation budget and checks start-job
+  exit, new invocation, stable Java PID, active/running and readiness together.
+- Unique completed job:
+  `v42-recovery-8d77902d-20260911T130300Z.service`, result success/exit0.
+  Its log and source/diff are preserved under
+  `/opt/rine-logic/releases/v42-recovery-8d77902d-20260911T130300Z/`.
+  Observed transition: activating/start-post to active/running, same new PID
+  `658723`, invocation `7595bd8e24fb4e2fba065652330806b4`, start-job exit0,
+  readiness200; bounded start elapsed 8.698 seconds.
+- V24 remains SUCCESS, checksum `-1944563506`; V23 remains SUCCESS,
+  checksum `954499978`. No CREATE grant or migration replay occurred in this
+  recovery. Independent connections confirmed migrator CREATE=false and
+  SUPERUSER=false. Card enabled/external/writer remain false; no 40-card
+  attachment has been installed and no collection window has started.
+
+### Dedicated role, credentials and native runtime: distinguish each result
+
+- Executed the approved three-new-table ACL convergence and writer bootstrap.
+  Snapshot permits SELECT/INSERT/UPDATE, not DELETE; spot_bar and
+  feature_history permit SELECT/INSERT/DELETE, not UPDATE. The old application
+  role has none of these four rights on the three new tables. The exact role
+  verifier passed; no old table/default ACL was changed.
+- Protected Owner count/fingerprint stayed `28` /
+  `8160d69e76965000e9eb7f749a13228a`; old default ACL fingerprint stayed
+  `1b6b4aa26506b35a4dad6fe6552a9d81`; old non-card object ACL fingerprint stayed
+  `c5ffb5cd9afbe47814d79557a6b293ac`. All three card table counts are still 0.
+- Initial dedicated SCRAM credential was generated only in protected memory /
+  root0400 candidate storage, set through the existing administration channel,
+  verified by the exact running JAR through a new connection and atomically
+  installed. Values were not printed, copied to ordinary environment/argv or
+  hashed. Loopback HBA independently confirms `scram-sha-256`, not trust.
+  `FRESH_CONNECTION=PASS`, `RESTART_REQUIRED=YES`; no restart followed.
+- An independent non-Web systemd verifier under service UID999 correctly
+  revealed a further runtime compatibility gap: systemd255 delivers root:root
+  0440 credentials in a root:root 0550 read-only tmpfs, with a named ACL granting
+  UID999 read (directory read/execute) and no other named user/group. The old
+  Java expected-owner/0400 check rejects this. Root source-file verification is
+  **not** claimed as service credential consumption. Actual application writer
+  activation remains NOT_EXECUTED pending a reviewed source fix/new release.
+- Actual target-host offline native probe passed for this JAR: Linux x86_64,
+  Java17.0.20, XGBoost2.1.4, libgomp.so.1 (installed package
+  `14.2.0-4ubuntu2~24.04.1`), feature version `SPOT_CARD_FEATURES_V2_SIGNED_PIT`,
+  45 features / 3 TEST_FIXTURE_ONLY rows. LONG/SHORT raw and Beta maximum errors
+  were all 0, exit0. The first probe rejected an incorrectly mixed temporary
+  bundle directory before inference; the second used the exact three-file
+  fixture directory. Neither file-list verification nor model checks were
+  weakened. Both logs remain under
+  `/tmp/v42-native-probe-8d77902d.dFnZW5Yz/`; test models were deleted afterwards.
+  No fixture was installed as a production bundle. Probe output's generic
+  `LOCAL_STANDARD_JAR` label describes the probe mode; the recorded execution
+  host is Staging. This is native interoperability only, not whole-system or
+  production-model acceptance.
+
+### Remaining hard execution stops
+
+1. Existing `/var/lib/rine-logic` is UID999/GID988, mode0750. The approved fixed
+   collection/archive paths require root-trusted ancestry in the current
+   preflight. Merely creating root-owned children cannot satisfy that check.
+   No ancestor was chowned/chmodded, no symlink/mount bypass was used, and no
+   collection directory or ARMED configuration was installed. This exact
+   storage-contract/environment mismatch still requires resolution.
+2. PRICE transport identity, per-user API/event/replay delivery, actual model
+   lifecycle times and explicit Owner-only SHADOW UI projection are being
+   corrected in the existing 64-path business worktree. They are not part of
+   the running 8d77902 JAR and require their own full regression, review,
+   candidate identity and exact-version deployment approval.
+3. C1 GET probes and C2 finite collection are NOT_EXECUTED. No quota/window was
+   invented or consumed, no auto extension occurred, and no real model was
+   trained. New-card browser/latency/mature-label acceptance remains
+   NOT_EXECUTED. The old page and startup success are not substituted for it.
+
+`MODEL_MODE=SHADOW`, `PRODUCTION_MODEL_READY=NO`,
+`ASSET_CARD_LIVE_READY=NO`, `CURRENT_PHASE_DONE=NO`.
+
+### Retained source correction and renewed verification — 2026-09-12
+
+The same business worktree/branch continues from `b054d05e3c827d0a24978e378aac4edf993c2a25`;
+the merged release and audited-source ancestry are preserved. These corrections
+are **not** the running 8d77902 JAR. No new release, collection window, model
+training, AI/Telegram call or Owner-position operation was performed here.
+
+- PRICE now uses the actual trade identity for transport while preserving the
+  separate durable signal/risk snapshot identity; repeated trades update only
+  price fields and never reload Home or write a price-only snapshot.
+- Card events use authenticated per-user delivery and current membership, not
+  global broadcast/cache replay. Reconnection resolves a current safe snapshot;
+  stream cleanup preserves the existing generic SSE lifecycle callbacks.
+- Java and Python lifecycle validation use actual `labelAvailableAt`, retain
+  the four-hour embargo, bind `validatedThrough` in the model, and enforce the
+  same half-open validity interval. No threshold/formula changed.
+- A single explicitly configured, Session-verified Owner may inspect SHADOW
+  card price/risk. Preview never enables a model, exposes unqualified direction
+  or confidence, or falls back to an old probability. Same-version field-failure
+  revocations are checked against the full identity and cannot restore stale
+  values or erase unaffected fields.
+- Protected source credentials still require their existing 0400/0600 channel.
+  Only the exact systemd runtime path additionally accepts the independently
+  observed root0440/root0550, exact service-UID ACL and read-only trusted tmpfs.
+  The bounded isolated Python helper reads metadata only; Java checks identity
+  before/after reading and rejects extra ACL entries, wrong UID/path/environment,
+  writable mount and missing prerequisites. No default-connection fallback.
+
+At the 2026-09-12 read-only recheck, Staging was still active/running with PID
+658723, the same invocation, readiness200 and the same 8d77902 JAR checksum.
+The card drop-in was absent. The already-used extra startup was not repeated.
+
+Local frontend event matrix and Python **49 tests / zero skips** passed again.
+The new real-tmpfs test found that Docker Desktop kernel
+`6.12.76-linuxkit` explicitly has `CONFIG_TMPFS_POSIX_ACL` unset (ext4 ACL is
+enabled). A named tmpfs ACL fails with EOPNOTSUPP before Java is exercised.
+This is **not** runtime acceptance. Only this proven non-CI macOS environment
+is reported as a local test skip; the tagged Linux CI test must actually run,
+and unsupported/missing runtime there fails the check. Its fixture has no host
+mounts or network, uses a disposable tmpfs, and drops UID/GID/capabilities before
+the actual production helper and Java reader execute. Ordinary directory tests
+are not substituted for systemd ACL evidence.
+
+The first full rerun also exposed a generated Python bytecode cache to an old
+UTF-8 source scanner. The cache was preserved outside the repository at
+`/private/tmp/v42-python-cache-preserved.zmnAA4`; no source-scanner assertion was
+changed or skipped. Subsequent commands disable bytecode generation. Final
+full-suite counts, candidate JAR identity and exact-head CI are recorded after
+their actual execution; earlier 8d77902/fc95 evidence is not relabelled.
+
+The remaining storage decision is explicit, not a request for broad new
+authority: prefer a new root-owned `/var/lib/rine-logic-asset-card` parent with
+service-owned `collection` and `archive` children, instead of changing the old
+service-owned `/var/lib/rine-logic` parent. These paths are **proposed only**;
+they have not been created or substituted into the fixed-path runtime contract.
+Owner approval must cover the exact path adjustment and subsequent new-version
+release. Before any ARMED start, recheck the actual PGDATA/state/archive device,
+free space, shared-IP and account quota, bind the single authenticated preview
+account and freeze the absolute window. No missing value is defaulted into an
+authorization. The current card-disabled 8d77902 service stays in place while
+these stops are unresolved.
+
+Final pre-commit local regression: **5,552 tests / 520 suites / 0 failures /
+0 errors / 14 skips**, exit0. The 13 historical opt-in skips remain unchanged;
+the fourteenth is the explicitly unexecuted Linux tmpfs ACL case above. It is
+not counted as a pass and requires actual exact-head Linux CI execution before
+this credential correction is accepted. Log:
+`/private/tmp/v42-0912-full-maven-verified.log`. The existing build plugin
+regenerated actual worktree `b054d05e... / dirty=true` before this run; no Git
+location overrides were inherited by test processes. The retained old JAR
+rollback still boots after V24 with data retained (this rerun's Docker carrier
+is aarch64; the preceding x86_64 rollback evidence remains separately recorded).
+Python49, the frontend matrix, shell/JS syntax, diff and added-diff secret-pattern
+check (zero matches) pass. Product Source, task validation, workflow-contract
+and exact machine self-tests pass, including 40 V42 outer cases. All 23 changed
+paths belong to the unchanged 64-path list; no wildcard or gate-owner edits.
+
 ## V42 unified finite-SHADOW execution package — 2026-09-11 follow-up
 
 本节取代下方历史预检中的“仅人工停采集”“归档没有生产调用者”和“旧JAR回滚待验证”三个未完成结论；历史数据盘点、服务器身份和历史测试结果原样保留。**本轮仅实现、隔离测试、提交与推送；本节所有真实执行命令仍待 Owner 对这一份执行包统一批准。** 不合并、不安装、不授予真实权限、不联网探测或采集、不训练。

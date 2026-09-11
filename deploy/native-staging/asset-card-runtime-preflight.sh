@@ -39,6 +39,7 @@ native_meta() {
 native_path() { printf '%s%s' "$NATIVE_ROOT" "$1"; }
 native_init() {
   NATIVE_ROOT=; NATIVE_MANIFEST=; NATIVE_ACTION=CHECK; NATIVE_CONFIRM=; NATIVE_CANDIDATE=; NATIVE_SOURCE=; NATIVE_BUNDLE_SHA=
+  OWNER_PREVIEW_USER_ID=NONE
   while (( $# )); do
     case "$1" in
       --manifest|--test-root|--confirm|--candidate|--source|--bundle-sha256)
@@ -73,6 +74,7 @@ native_init() {
     key=${line%%=*}; value=${line#*=}
     case "$key" in
       MANIFEST_KIND|TARGET_ARCH|SERVICE_NAME|APP_JAR|APP_JAR_SHA256|MAIN_UNIT|MAIN_UNIT_SHA256|SCHEDULER_DROPIN|SCHEDULER_DROPIN_SHA256|READY_SCRIPT|READY_SCRIPT_SHA256|RELEASE_METADATA|RELEASE_METADATA_FORMAT|RELEASE_METADATA_SHA256|MODEL_ROOT|CARD_DROPIN|CREDENTIAL_SOURCE|CREDENTIAL_ID|ROOT_UID|SERVICE_UID|WRITER_JDBC_URL|EXPECTED_DATABASE|WRITER_ROLE|MODEL_MODE|PRODUCTION_MODEL_READY|CARD_STARTUP_MODE|COLLECTION_WINDOW_ID|COLLECTION_STARTS_AT|COLLECTION_ENDS_AT|COLLECTION_SYMBOLS|COLLECTION_STATE_DIRECTORY|ARCHIVE_DIRECTORY|SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE|SHARED_IP_WEIGHT_LIMIT_PER_MINUTE|SHARED_IP_HEADROOM_CONFIRMED_AT|MAXIMUM_REST_REQUESTS|MAXIMUM_REST_WEIGHT|MAXIMUM_CONNECTION_ATTEMPTS|MAXIMUM_CONTROL_MESSAGES|MAXIMUM_NEW_ROWS|MAXIMUM_DATABASE_GROWTH_BYTES|MAXIMUM_WAL_GROWTH_BYTES|MINIMUM_FREE_BYTES|STORAGE_SAME_FILESYSTEM_VERIFIED|DATABASE_FILESYSTEM_DEVICE) ;;
+      OWNER_PREVIEW_USER_ID) ;;
       *) native_fail MANIFEST_INVALID;;
     esac
     [[ "$seen" != *"|$key|"* && -n "$value" && "$value" != REPLACE_* && "$value" != *'$'* && "$value" != *'`'* ]] || native_fail MANIFEST_INVALID
@@ -91,6 +93,14 @@ native_init() {
     && "$CREDENTIAL_ID" = asset-card-db-password && "$WRITER_ROLE" = rine_asset_card_writer
     && "$MODEL_MODE" = SHADOW && "$PRODUCTION_MODEL_READY" = NO ]] || native_fail MANIFEST_IDENTITY_INVALID
   [[ "$ROOT_UID" =~ ^[0-9]+$ && "$SERVICE_UID" =~ ^[0-9]+$ && "$SERVICE_UID" != "$ROOT_UID" ]] || native_fail OWNER_INVALID
+  OWNER_PREVIEW_USER_IDS=
+  if [[ "$OWNER_PREVIEW_USER_ID" != NONE ]]; then
+    [[ "$OWNER_PREVIEW_USER_ID" =~ ^[1-9][0-9]{0,18}$ ]] || native_fail OWNER_PREVIEW_ID_INVALID
+    if (( ${#OWNER_PREVIEW_USER_ID} == 19 )); then
+      [[ "$OWNER_PREVIEW_USER_ID" < 9223372036854775808 ]] || native_fail OWNER_PREVIEW_ID_INVALID
+    fi
+    OWNER_PREVIEW_USER_IDS=$OWNER_PREVIEW_USER_ID
+  fi
   [[ "$EXPECTED_DATABASE" =~ ^[A-Za-z0-9_]+$ && "$WRITER_JDBC_URL" =~ ^jdbc:postgresql://[A-Za-z0-9.:-]+/[A-Za-z0-9_]+$ ]] || native_fail DATABASE_IDENTITY_INVALID
   [[ "$WRITER_JDBC_URL" = */"$EXPECTED_DATABASE" && "$RELEASE_METADATA_FORMAT" =~ ^[A-Z0-9_]+$ ]] || native_fail DATABASE_IDENTITY_INVALID
   # Bind the independently observed native release format, never an arbitrary file.
@@ -254,6 +264,12 @@ native_apply_authority() {
 native_platform_checks() {
   [[ $(uname -s) = Linux && $(uname -m) = x86_64 ]] || native_fail NATIVE_PLATFORM_MISMATCH
   "$NATIVE_JAVA" -version 2>&1 | grep -Eq '^.*version "17[.\"]' || native_fail JAVA17_REQUIRED
+  if [[ "$CARD_STARTUP_MODE" = ARMED ]]; then
+    # Existing OS interpreter, metadata-only: no installation, secret read, network or package imports.
+    [[ -x /usr/bin/python3 ]] || native_fail SYSTEMD_CREDENTIAL_METADATA_RUNTIME_UNAVAILABLE
+    /usr/bin/python3 -I -S -B -c 'import os, struct, sys; assert sys.version_info.major == 3 and hasattr(os, "getxattr")' \
+      >/dev/null 2>&1 || native_fail SYSTEMD_CREDENTIAL_METADATA_RUNTIME_UNAVAILABLE
+  fi
   if [[ -x /sbin/ldconfig ]]; then /sbin/ldconfig -p 2>/dev/null | grep -F 'libgomp.so.1' >/dev/null || native_fail OPENMP_UNAVAILABLE;
   else native_fail OPENMP_UNAVAILABLE; fi
 }

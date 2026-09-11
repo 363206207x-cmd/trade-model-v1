@@ -36,6 +36,8 @@ public class AssetCardProperties {
     private Path trainingExportDirectory;
     private boolean trainingExportEnabled;
     private Set<String> canarySymbols = Set.of();
+    // Server configuration only. This observational cohort never promotes a model out of SHADOW.
+    private Set<Long> ownerPreviewUserIds = Set.of();
     private final CollectionWindow collectionWindow = new CollectionWindow();
     private boolean retentionEnabled;
     private Path archiveDirectory;
@@ -237,6 +239,13 @@ public class AssetCardProperties {
     public boolean isTrainingExportEnabled() { return trainingExportEnabled; }
     public void setTrainingExportEnabled(boolean value) { trainingExportEnabled=value; }
     public Set<String> getCanarySymbols() { return canarySymbols; }
+    public Set<Long> getOwnerPreviewUserIds() { return ownerPreviewUserIds; }
+    public void setOwnerPreviewUserIds(Set<Long> value) {
+        if (value == null) { ownerPreviewUserIds = Set.of(); return; }
+        if (value.size() > 1 || value.stream().anyMatch(id -> id == null || id <= 0))
+            throw new IllegalArgumentException("Owner preview requires at most one exact positive authenticated user identity");
+        ownerPreviewUserIds = Set.copyOf(value);
+    }
     public void setCanarySymbols(Set<String> value) {
         if (value == null) { canarySymbols = Set.of(); return; }
         Set<String> normalized = new java.util.HashSet<>();

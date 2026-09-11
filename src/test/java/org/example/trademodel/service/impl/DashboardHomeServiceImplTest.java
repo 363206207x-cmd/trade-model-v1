@@ -493,12 +493,12 @@ class DashboardHomeServiceImplTest {
         var canonicalBefore = withoutCards.getAssets().stream().map(this::canonicalCardFacts).toList();
         assertThat(withoutCards.getAssets()).allSatisfy(asset -> assertThat(asset.getCardSignal()).isNull());
 
-        when(cards.snapshot(eq("LINKUSDT"), anyString())).thenReturn(
+        when(cards.snapshotForUser(eq(USER_ID), eq("LINKUSDT"), anyString())).thenReturn(
                 isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .25));
-        when(cards.snapshot(eq("BTCUSDT"), anyString())).thenReturn(
+        when(cards.snapshotForUser(eq(USER_ID), eq("BTCUSDT"), anyString())).thenReturn(
                 isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.STRONG_LONG, .99, .01));
-        when(cards.usesCardSignalDisplay("LINKUSDT")).thenReturn(true);
-        when(cards.usesCardSignalDisplay("BTCUSDT")).thenReturn(true);
+        when(cards.usesCardSignalDisplay(USER_ID, "LINKUSDT")).thenReturn(true);
+        when(cards.usesCardSignalDisplay(USER_ID, "BTCUSDT")).thenReturn(true);
         service.setAssetCardService(cards);
         DashboardHomeVO withCards = service.getHomeForUser(USER_ID, null, 6, null);
 
@@ -511,10 +511,10 @@ class DashboardHomeServiceImplTest {
         assertThat(withCards.getAssets()).extracting(DashboardHomeVO.AssetVO::getOpportunityScore).containsExactly(94, 88);
         verify(ranking, times(2)).rankForHome(USER_ID, 6);
         verifyNoMoreInteractions(ranking);
-        verify(cards).snapshot(eq("LINKUSDT"), anyString());
-        verify(cards).snapshot(eq("BTCUSDT"), anyString());
-        verify(cards).usesCardSignalDisplay("LINKUSDT");
-        verify(cards).usesCardSignalDisplay("BTCUSDT");
+        verify(cards).snapshotForUser(eq(USER_ID), eq("LINKUSDT"), anyString());
+        verify(cards).snapshotForUser(eq(USER_ID), eq("BTCUSDT"), anyString());
+        verify(cards).usesCardSignalDisplay(USER_ID, "LINKUSDT");
+        verify(cards).usesCardSignalDisplay(USER_ID, "BTCUSDT");
         verifyNoMoreInteractions(cards);
     }
 
@@ -572,6 +572,37 @@ class DashboardHomeServiceImplTest {
         }
     }
 
+    @Test
+    void ownerShadowHomeDisplayIsSessionScopedAndPreservesCanonicalAndPoolFacts() {
+        var properties = new AssetCardProperties(); properties.setEnabled(true);
+        properties.setModelMode(AssetCardProperties.ModelMode.SHADOW);
+        properties.setOwnerPreviewUserIds(java.util.Set.of(USER_ID));
+        var pool = mock(AssetPoolService.class);
+        var mapper = mock(AssetCardMapper.class);
+        var market = mock(AssetCardMarketDataService.class);
+        var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+        try (var cards = new AssetCardService(properties, market, mapper, pool, events, new ObjectMapper().findAndRegisterModules())) {
+            service.setAssetPoolService(pool); service.setAssetCardService(cards);
+            for (Long userId : List.of(USER_ID, USER_ID + 1)) {
+                var btc = canonicalCardAsset("BTCUSDT", "BTC/USDT", 51, "WEAK_BEARISH", "MEDIUM", 94);
+                var before = canonicalCardFacts(btc);
+                var home = new DashboardHomeVO(); home.setAssets(List.of(btc)); home.setSelectedSymbol("BTCUSDT");
+                ReflectionTestUtils.invokeMethod(service, "attachCompleteRuntimeProjection", home, userId, null);
+                assertThat(btc.isCardSignalDisplayEnabled()).isEqualTo(userId.equals(USER_ID));
+                if (userId.equals(USER_ID)) {
+                    assertThat(btc.getCardSignal().signal().status()).isEqualTo("SHADOW");
+                    assertThat(btc.getCardSignal().signal().direction()).isNull();
+                    assertThat(btc.getCardSignal().signal().calibratedConfidence()).isNull();
+                } else assertThat(btc.getCardSignal()).isNull();
+                assertThat(canonicalCardFacts(btc)).isEqualTo(before);
+                assertThat(home.getAssetPool().stream().map(this::canonicalCardFacts).toList()).containsExactly(before);
+            }
+            verify(mapper).selectSnapshotJson("BTCUSDT"); verify(market).quote(eq("BTCUSDT"), any());
+            verifyNoMoreInteractions(mapper, market); verifyNoInteractions(events);
+            assertThat(properties.getModelMode()).isEqualTo(AssetCardProperties.ModelMode.SHADOW);
+        }
+    }
+
     private DashboardHomeVO.AssetVO canonicalCardAsset(String raw, String display, int confidence,
                                                        String bias, String risk, int opportunityScore) {
         var asset = new DashboardHomeVO.AssetVO();
@@ -625,7 +656,7 @@ class DashboardHomeServiceImplTest {
                         null, Map.of(), java.util.Set.of(symbol), null);
                 int count = AssetCardFeatureService.FEATURE_NAMES.size();
                 ReflectionTestUtils.setField(bundle, "lifecycle", new AssetCardModelBundle.Lifecycle(
-                        "TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK", Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"),
+                        "TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK", Instant.EPOCH, Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"),
                         java.util.Set.of("0".repeat(count)), java.util.Collections.nCopies(count, 0.0),
                         java.util.Collections.nCopies(count, 2.0), .5));
                 var source = new AssetCardModelBundle.Source(java.nio.file.Path.of("TEST_ONLY_" + symbol), "0".repeat(64));

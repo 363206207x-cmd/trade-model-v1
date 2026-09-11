@@ -132,6 +132,16 @@ name; failures leave the old live file usable. These are protected rollback
 credentials, not logs or temporary plaintext. Their eventual approved retirement
 is an operator action. Output is `RESTART_REQUIRED=YES`, not a hot-rotation claim.
 
+The protected root0400 source and the systemd-delivered runtime credential are
+different trust channels. On the verified systemd255 host, runtime files are
+root:root0440 in a root:root0550 read-only tmpfs and an exact named-user ACL grants
+only the service UID access. Java's POSIX mode alone cannot prove this ACL.
+The dedicated runtime validation therefore uses the already-present
+`/usr/bin/python3` with isolated standard-library metadata inspection; it is not
+a new package installation, Python model runtime or credential-content reader.
+Absence/failure of this dependency must fail closed before ARMED operation;
+PREPARED source-file verification does not claim systemd runtime verification.
+
 The verifier invocation uses the standard JAR's independent main:
 
 ```text
@@ -196,6 +206,17 @@ model mode stays SHADOW. No reload, restart, enable, remote command
 or deployment is performed. Applying a drop-in is not proof it has been loaded.
 
 ## Fixed-window SHADOW and verified retention
+
+Owner-only card UI inspection is separate from model publication eligibility.
+The optional non-secret manifest field `OWNER_PREVIEW_USER_ID` defaults to `NONE`;
+only one positive, Session-verified user ID may be configured. The installer
+renders `TRADE_MODEL_ASSET_CARD_OWNER_PREVIEW_USER_IDS` without changing SHADOW,
+the three collection switches or the finite-window checks. A missing field in
+an older manifest also means no preview account. The HTTP client cannot select
+this account. Preview shows independently verified price/risk fields, not an
+unqualified model direction, a probability or an old confidence fallback.
+Changing this source configuration is not installation, a restart or a new
+network allowance; every new candidate still requires its own exact identity.
 
 The unified approval package is in
 `docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md`, first

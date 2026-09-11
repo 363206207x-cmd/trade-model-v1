@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.async.DeferredResult;
+import org.springframework.web.context.request.async.DeferredResultProcessingInterceptor;
+import org.springframework.web.context.request.async.WebAsyncUtils;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -55,13 +60,24 @@ public class DashboardHomeController {
     }
 
     @GetMapping(path = "/stream", produces = "text/event-stream")
-    public SseEmitter stream() {
+    public SseEmitter stream(HttpServletRequest request) {
         Long userId = authenticatedUserIdResolver.requireCurrentUserId();
         if (dashboardLiveEventService == null) {
             SseEmitter unavailable = new SseEmitter(1L);
             unavailable.completeWithError(new IllegalStateException("HOME_LIVE_STREAM_UNAVAILABLE"));
             return unavailable;
         }
-        return dashboardLiveEventService.subscribe(userId);
+        SseEmitter emitter = dashboardLiveEventService.subscribe(userId);
+        if (assetCardService != null) {
+            String token = assetCardService.registerCardStream(userId);
+            // Do not replace the generic SSE service's emitter completion/error/timeout callbacks.
+            WebAsyncUtils.getAsyncManager(request).registerDeferredResultInterceptor("asset-card-" + token,
+                    new DeferredResultProcessingInterceptor() {
+                        @Override public <T> void afterCompletion(NativeWebRequest ignored, DeferredResult<T> result) {
+                            assetCardService.unregisterCardStream(token);
+                        }
+                    });
+        }
+        return emitter;
     }
 }

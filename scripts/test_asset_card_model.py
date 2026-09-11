@@ -18,6 +18,25 @@ model = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(model)
 
 
+def lifecycle_fixture():
+    """Cross-language schema fixture only: no models, training, metrics or production readiness."""
+    width=len(model.FEATURE_NAMES)
+    manifest={"provenance":{"datasetVersion":"TEST_DATA"},"validUntil":"2030-01-01T00:00:00Z",
+              "releasePolicy":{"riskVersion":"TEST_RISK","maxFeatureOutlierFraction":.5,
+                               "driftLowerQuantile":.1,"driftUpperQuantile":.9}}
+    report={"patternMetrics":{"0"*width:{}},"splits":[
+        {"name":name,"count":2,"start":f"2026-01-{i+1:02d}T19:00:00Z",
+         "end":f"2026-01-{i+1:02d}T19:59:59Z","labelEnd":f"2026-01-{i+1:02d}T23:59:59Z",
+         "labelAvailableAt":f"2026-01-{i+2:02d}T00:00:00.000000001Z"}
+        for i,name in enumerate(("TRAIN","CALIBRATION","VALIDATION","TEST"))]}
+    train=[{"vector":[0.0]*width},{"vector":[1.0]*width}]
+    life=model.build_lifecycle(manifest,report,train,"2026-01-05T00:00:00.000000001Z")
+    return {"dataKind":"TEST_FIXTURE_ONLY","productionModelReady":False,
+            "manifest":{**manifest,"lifecycle":life},
+            "report":{"datasetVersion":"TEST_DATA","final":report,"lifecycle":copy.deepcopy(life)},
+            "train":train}
+
+
 def generate_native_fixture(output,candidate_sha,jar_sha256):
     """Explicit, disposable interoperability data; deliberately NOT a production bundle."""
     if not re.fullmatch(r"[0-9a-f]{40}",candidate_sha) or not re.fullmatch(r"[0-9a-f]{64}",jar_sha256):
@@ -59,6 +78,51 @@ def generate_native_fixture(output,candidate_sha,jar_sha256):
 
 
 class ModelTests(unittest.TestCase):
+    def test_lifecycle_uses_actual_availability_and_preserves_fixed_horizon(self):
+        fixture=lifecycle_fixture(); life=fixture["manifest"]["lifecycle"]; splits=fixture["report"]["final"]["splits"]
+        self.assertEqual(life["trainedThrough"],splits[1]["labelAvailableAt"])
+        self.assertEqual(life["validatedThrough"],splits[3]["labelAvailableAt"])
+        self.assertGreater(model.timestamp(life["trainedThrough"]),model.timestamp(splits[1]["labelEnd"]))
+        self.assertEqual(splits[1]["labelEnd"],"2026-01-02T23:59:59Z")
+        self.assertEqual(life["featureLower"],[.1]*len(model.FEATURE_NAMES))
+        self.assertEqual(life["featureUpper"],[.9]*len(model.FEATURE_NAMES))
+        self.assertFalse(fixture["productionModelReady"])
+
+    def test_lifecycle_rejects_missing_naive_early_and_overlapping_availability(self):
+        fixture=lifecycle_fixture(); original=fixture["report"]["final"]["splits"]
+        for index in range(4):
+            for bad in (None,"2026-01-01 12:00:00","2025-01-01T00:00:00Z"):
+                invalid=copy.deepcopy(original)
+                if bad is None: invalid[index].pop("labelAvailableAt")
+                else: invalid[index]["labelAvailableAt"]=bad
+                with self.subTest(index=index,bad=bad),self.assertRaises((ValueError,KeyError)):
+                    model.validate_split_times(invalid)
+        invalid=copy.deepcopy(original)
+        invalid[0]["labelAvailableAt"]=model.instant(model.timestamp(invalid[1]["start"])-model.HORIZON+model.Decimal(".000000001"))
+        with self.assertRaisesRegex(ValueError,"embargo"): model.validate_split_times(invalid)
+
+    def test_lifecycle_validity_starts_after_final_validation_and_expires_exclusively(self):
+        fixture=lifecycle_fixture(); manifest=fixture["manifest"]; report=fixture["report"]["final"]
+        start=model.timestamp(report["splits"][3]["labelAvailableAt"]); end=model.timestamp(manifest["validUntil"])
+        for checked in (start-model.Decimal(".000000001"),end,end+model.Decimal(".000000001")):
+            with self.subTest(checked=str(checked)),self.assertRaisesRegex(ValueError,"not yet validated or has expired"):
+                model.build_lifecycle(manifest,report,fixture["train"],checked)
+        for checked in (start,end-model.Decimal(".000000001")):
+            self.assertEqual(model.build_lifecycle(manifest,report,fixture["train"],checked)["validatedThrough"],model.instant(start))
+        for expires in (start,start-model.Decimal(".000000001")):
+            with self.assertRaisesRegex(ValueError,"not yet validated or has expired"):
+                model.build_lifecycle({**manifest,"validUntil":model.instant(expires)},report,fixture["train"],start)
+
+    def test_lifecycle_normalizes_offsets_without_losing_nanoseconds(self):
+        fixture=lifecycle_fixture(); report=fixture["report"]["final"]
+        report["splits"][1]["labelAvailableAt"]="2026-01-03T08:00:00.000000001+08:00"
+        report["splits"][3]["labelAvailableAt"]="2026-01-05T08:00:00.000000001+08:00"
+        manifest={**fixture["manifest"],"validUntil":"2030-01-01T08:00:00+08:00"}
+        life=model.build_lifecycle(manifest,report,fixture["train"],"2026-01-05T08:00:00.000000001+08:00")
+        self.assertEqual(life["trainedThrough"],"2026-01-03T00:00:00.000000001Z")
+        self.assertEqual(life["validatedThrough"],"2026-01-05T00:00:00.000000001Z")
+        self.assertEqual(life["validUntil"],"2030-01-01T00:00:00Z")
+
     def test_json_numeric_policy_arrays_remain_numbers_while_times_keep_nanoseconds(self):
         value=model.decode_json('{"signalAsOf":1767268800.000000001,"volatilityStrata":[0.01,0.02],"nested":[[0.5],{"value":0.25,"availableAt":1767268800.000000002}]}')
         self.assertTrue(all(model.finite(v) for v in value["volatilityStrata"]))

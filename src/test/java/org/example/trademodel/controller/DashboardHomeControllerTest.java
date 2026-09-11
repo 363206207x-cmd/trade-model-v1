@@ -253,6 +253,69 @@ class DashboardHomeControllerTest {
         return MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
+    @Test
+    void shadowOwnerPreviewComesOnlyFromSessionAndCannotBeEnabledByRequestUserId() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.SHADOW);
+            fixture.properties.setOwnerPreviewUserIds(java.util.Set.of(7L));
+            var members = List.of(new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin", "SPOT", "USDT", true, 1, "USER"));
+            when(fixture.pool.listForUser(7L)).thenReturn(members);
+            when(fixture.pool.listForUser(8L)).thenReturn(members);
+            var mvc = cardMvc(fixture.service);
+            mvc.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS").param("symbols", "BTCUSDT")
+                            .param("ownerId", "8").param("userId", "8"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].signal.status").value("SHADOW"))
+                    .andExpect(jsonPath("$.data[0].signal.direction").isEmpty())
+                    .andExpect(jsonPath("$.data[0].signal.calibratedConfidence").isEmpty())
+                    .andExpect(jsonPath("$.data[0].signal.pLong").isEmpty())
+                    .andExpect(jsonPath("$.data[0].signal.pShort").isEmpty());
+            org.mockito.Mockito.clearInvocations(fixture.mapper, fixture.market);
+            when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(8L);
+            mvc.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS").param("symbols", "BTCUSDT")
+                            .param("ownerId", "7").param("userId", "7"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+            verify(fixture.pool).listForUser(7L); verify(fixture.pool).listForUser(8L);
+            verifyNoInteractions(fixture.mapper, fixture.market, fixture.events, dashboardHomeService);
+        }
+    }
+
+    @Test
+    void streamRegistersOnlySessionUserAndAsyncCompletionPreservesGenericEmitterCleanup() throws Exception {
+        var events = new DashboardLiveEventService();
+        var cards = mock(AssetCardService.class);
+        when(cards.registerCardStream(7L)).thenReturn("server-generated-test-token");
+        var controller = new DashboardHomeController(dashboardHomeService, authenticatedUserIdResolver);
+        controller.setAssetCardService(cards); controller.setDashboardLiveEventService(events);
+        var mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        var result = mvc.perform(get("/api/dashboard/stream").param("userId", "8").param("ownerId", "8"))
+                .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted())
+                .andReturn();
+        verify(cards).registerCardStream(7L);
+        @SuppressWarnings("unchecked")
+        var subscribers = (java.util.Map<Long, ?>) org.springframework.test.util.ReflectionTestUtils.getField(events, "subscribers");
+        org.assertj.core.api.Assertions.assertThat(subscribers).containsOnlyKeys(7L);
+        result.getRequest().getAsyncContext().complete();
+        verify(cards).unregisterCardStream("server-generated-test-token");
+        org.assertj.core.api.Assertions.assertThat(subscribers).isEmpty();
+        verifyNoMoreInteractions(cards);
+        verifyNoInteractions(dashboardHomeService);
+        org.assertj.core.api.Assertions.assertThat(events.latestEvents()).isEmpty();
+    }
+
+    @Test
+    void unauthenticatedStreamCannotRegisterAnyCardSubscriber() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenThrow(new AuthenticatedUserResolutionException());
+        var cards = mock(AssetCardService.class);
+        var events = mock(DashboardLiveEventService.class);
+        var controller = new DashboardHomeController(dashboardHomeService, authenticatedUserIdResolver);
+        controller.setAssetCardService(cards); controller.setDashboardLiveEventService(events);
+        MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build()
+                .perform(get("/api/dashboard/stream").param("userId", "7"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(cards, events, dashboardHomeService);
+    }
+
     /** Real request-facing service with only local test doubles; never starts background workers. */
     private static final class CardReadFixture implements AutoCloseable {
         final AssetPoolService pool = mock(AssetPoolService.class);
