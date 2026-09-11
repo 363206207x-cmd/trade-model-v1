@@ -561,6 +561,12 @@ public class DashboardHomeVO {
     }
 
     public static class AssetVO {
+        private boolean cardSignalDisplayEnabled;
+        public boolean isCardSignalDisplayEnabled() { return cardSignalDisplayEnabled; }
+        public void setCardSignalDisplayEnabled(boolean value) { cardSignalDisplayEnabled = value; }
+        private org.example.trademodel.assetcard.AssetCardSnapshot cardSignal;
+        public org.example.trademodel.assetcard.AssetCardSnapshot getCardSignal() { return cardSignal; }
+        public void setCardSignal(org.example.trademodel.assetcard.AssetCardSnapshot value) { cardSignal = value; }
         private String snapshotId;
         public String getSnapshotId() { return snapshotId; }
         public void setSnapshotId(String value) { snapshotId = value; }

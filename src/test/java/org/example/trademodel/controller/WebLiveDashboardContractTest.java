@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class WebLiveDashboardContractTest {
 
     @Test
@@ -194,6 +195,11 @@ class WebLiveDashboardContractTest {
     }
 
     @Test
+    void assetCardRuntimeHasFieldOnlyEventsAndIndependentUserTimezoneClocks() throws Exception {
+        runNode("require('node:child_process').execFileSync(process.execPath, ['scripts/asset-card-runtime-matrix.mjs'], {stdio:'inherit'});");
+    }
+
+    @Test
     void desktopUsesAuthenticatedSseWithBoundedFallback() throws Exception {
         String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
         String controller = Files.readString(Path.of(
@@ -257,21 +263,22 @@ class WebLiveDashboardContractTest {
         runNode("""
                 const assert=require('node:assert/strict'),fs=require('node:fs');
                 const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
-                const handlers={},timers=new Map();let seq=0,refreshes=0,streams=0;
+                const handlers={},timers=new Map();let seq=0,refreshes=0,cardRefreshes=0,streams=0;
                 let homeFallbackTimer=null,homePollIntervalMs=0,homeStreamConnected=false,homeEventSource=null,
-                    homeRuntimeStarted=false,homeAbortController=null,homeLiveState='',currentHome={},selectedSymbol='BTCUSDT';
+                    homeRuntimeStarted=false,homeAbortController=null,assetCardAbortController=null,homeLiveState='',currentHome={},selectedSymbol='BTCUSDT';
                 const document={hidden:false,addEventListener:(type,fn)=>handlers[type]=fn};
                 function EventSource(){streams++;this.close=()=>{};this.addEventListener=()=>{};}
                 const window={EventSource,setInterval(fn,delay){timers.set(++seq,{fn,delay});return seq;},
                     clearInterval(id){timers.delete(id);},addEventListener(){}};
                 eval(source.split('/* Desktop Home runtime */')[0]);
-                const loadHome=async()=>{refreshes++;},lightweightHomeRefresh=loadHome,
+                const loadHome=async()=>{refreshes++;},lightweightHomeRefresh=async()=>{cardRefreshes++;},
                     renderHeader=()=>{},announce=()=>{},reportHomeRequestFailure=()=>{},applyHomeLiveEvent=()=>{};
-                eval(source.slice(source.indexOf('function scheduleHomeFallbackPoll('),source.indexOf('function stableSubmissionId('))
+                eval(source.slice(source.indexOf('function reportAssetCardRequestFailure('),source.indexOf('function stableSubmissionId('))
                     + ';startHomeLiveRuntime();startHomeLiveRuntime();');
                 assert.equal(streams,1);assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,15000);
                 homeEventSource.onopen();homeEventSource.onopen();
                 assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,60000);
+                assert.equal(cardRefreshes,2);assert.equal(refreshes,0);
                 homeEventSource.onerror();homeEventSource.onerror();
                 assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,15000);
                 document.hidden=true;handlers.visibilitychange();assert.equal(timers.size,0);

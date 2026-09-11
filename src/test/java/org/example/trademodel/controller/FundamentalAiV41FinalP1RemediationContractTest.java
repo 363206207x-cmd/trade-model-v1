@@ -255,10 +255,10 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 .contains("LOW", "MEDIUM", "HIGH", "EXTREME")
                 .doesNotContain("directionSemanticClass", "semantic-bullish", "semantic-bearish");
         assertThat(homeScript + workspaceScript)
-                .contains("directionSemanticClass(finalDirection)", "directionSemanticClass(live?.marketBias)")
+                .contains("assetCardDirectionClass(snapshot)", "directionSemanticClass(live?.marketBias)")
                 .doesNotContain("directionSemanticClass(asset.riskLevel)", "directionSemanticClass(live?.riskLevel)");
         assertThat(homeScript).contains(
-                "class=\"opportunity-risk\"",
+                "class=\"asset-card-risk-summary\"",
                 "class=\"risk-type-copy\"",
                 "riskClass(row.item.severity)")
                 .doesNotContain("class=\"opportunity-risk' + riskSemanticClass");

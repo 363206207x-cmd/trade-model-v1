@@ -132,7 +132,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "has(asset.confidenceLevel)", "has(asset.riskLevel)",
                 "[\"OBSERVATION\", \"DECISION\"].indexOf(slotType) >= 0",
-                "asset.marketBiasLabel", "asset.finalConfidence", "desktop.riskSummary(asset)",
+                "asset.cardSignal", "assetCardConfidence(snapshot)", "assetCardRiskItemsHtml(snapshot)",
                 "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
@@ -213,7 +213,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"]",
                 "function assetTicker(asset)",
-                "asset.marketBiasLabel", "asset.finalConfidence", "desktop.riskSummary(asset)",
+                "asset.cardSignal", "assetCardConfidence(snapshot)", "assetCardRiskItemsHtml(snapshot)",
                 "await api(\"/api/asset-pool\", { method: \"POST\"",
                 "await api(\"/api/asset-pool/search/\"",
                 "window.location.assign(\"/analysis/\"")

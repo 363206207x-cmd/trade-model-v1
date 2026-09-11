@@ -1,7 +1,18 @@
 package org.example.trademodel.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.assetcard.AssetCardMarketDataService;
+import org.example.trademodel.assetcard.AssetCardProperties;
+import org.example.trademodel.assetcard.AssetCardService;
+import org.example.trademodel.assetcard.AssetCardSnapshot;
+import org.example.trademodel.common.GlobalExceptionHandler;
+import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.mapper.AssetCardMapper;
+import org.example.trademodel.security.AuthenticatedUserResolutionException;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
+import org.example.trademodel.v41.DashboardLiveEventService;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,13 +24,18 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
+@org.junit.jupiter.api.Tag("core-regression")
 class DashboardHomeControllerTest {
     @Mock
     private DashboardHomeService dashboardHomeService;
@@ -74,6 +90,183 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.assetPool.length()").value(36))
                 .andExpect(jsonPath("$.data.assetPool[35].snapshotId").value("web-123"));
         verify(dashboardHomeService).getHomeForUser(7L, null, null, null);
+    }
+
+    @Test
+    void cardOnlySnapshotUsesSessionIdentityAndReadOnlyServiceForSixDisplayedMembers() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            var members = java.util.stream.IntStream.rangeClosed(1, 7).mapToObj(index ->
+                    new AssetPoolAssetDTO((long) index, "ASSET" + index + "USDT", "Asset " + index,
+                            "SPOT", "USDT", true, index, "USER")).toList();
+            when(fixture.pool.listForUser(7L)).thenReturn(members);
+            String[] requested = {"ASSET6USDT", "ASSET5USDT", "ASSET4USDT", "ASSET3USDT", "ASSET2USDT", "asset1usdt"};
+
+            cardMvc(fixture.service).perform(get("/api/dashboard/runtime-snapshot")
+                            .param("view", "ASSET_CARDS").param("symbols", requested)
+                            .param("ownerId", "999").param("userId", "999"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(6))
+                    .andExpect(jsonPath("$.data[0].symbol").value("ASSET6USDT"))
+                    .andExpect(jsonPath("$.data[5].symbol").value("ASSET1USDT"))
+                    .andExpect(jsonPath("$.data[5].assetName").value("Asset 1"))
+                    .andExpect(jsonPath("$.data[0].signal.status").value("INSUFFICIENT_DATA"))
+                    .andExpect(jsonPath("$.data[0].signal.calibratedConfidence").isEmpty())
+                    .andExpect(jsonPath("$.data.assets").doesNotExist())
+                    .andExpect(jsonPath("$.data.assetPool").doesNotExist());
+
+            verify(authenticatedUserIdResolver).requireCurrentUserId();
+            verify(fixture.pool).listForUser(7L);
+            for (int index = 1; index <= 6; index++) {
+                verify(fixture.mapper).selectSnapshotJson("ASSET" + index + "USDT");
+                verify(fixture.market).quote(org.mockito.ArgumentMatchers.eq("ASSET" + index + "USDT"),
+                        org.mockito.ArgumentMatchers.any(java.time.Instant.class));
+            }
+            verifyNoMoreInteractions(fixture.pool, fixture.mapper, fixture.market);
+            verifyNoInteractions(dashboardHomeService, fixture.events);
+        }
+    }
+
+    @Test
+    void cardOnlySnapshotRejectsSevenSymbolsBeforeAnyPoolOrSnapshotRead() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            cardMvc(fixture.service).perform(get("/api/dashboard/runtime-snapshot")
+                            .param("view", "ASSET_CARDS")
+                            .param("symbols", "BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "AAVEUSDT", "XRPUSDT", "TRXUSDT"))
+                    .andExpect(status().isBadRequest());
+            verify(authenticatedUserIdResolver).requireCurrentUserId();
+            verifyNoInteractions(dashboardHomeService, fixture.pool, fixture.mapper, fixture.market, fixture.events);
+        }
+    }
+
+    @Test
+    void cardOnlySnapshotRejectsForeignDuplicateAndMalformedSymbolsWithoutPartialReads() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            when(fixture.pool.listForUser(7L)).thenReturn(List.of(
+                    new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin", "SPOT", "USDT", true, 1, "USER")));
+            MockMvc cards = cardMvc(fixture.service);
+            for (String[] requested : List.of(new String[]{"BTCUSDT", "ETHUSDT"},
+                    new String[]{"BTCUSDT", "btcusdt"}, new String[]{"BTC/USDT"})) {
+                cards.perform(get("/api/dashboard/runtime-snapshot")
+                                .param("view", "ASSET_CARDS").param("symbols", requested)
+                                .param("ownerId", "999").param("userId", "999"))
+                        .andExpect(status().isBadRequest());
+            }
+            verify(fixture.pool, times(3)).listForUser(7L);
+            verifyNoMoreInteractions(fixture.pool);
+            verifyNoInteractions(dashboardHomeService, fixture.mapper, fixture.market, fixture.events);
+        }
+    }
+
+    @Test
+    void cardOnlySnapshotCannotUseForgedUserIdWithoutAuthenticatedSession() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenThrow(new AuthenticatedUserResolutionException());
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            cardMvc(fixture.service).perform(get("/api/dashboard/runtime-snapshot")
+                            .param("view", "ASSET_CARDS").param("symbols", "BTCUSDT")
+                            .param("ownerId", "7").param("userId", "7"))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(dashboardHomeService, fixture.pool, fixture.mapper, fixture.market, fixture.events);
+        }
+    }
+
+    @Test
+    void cardOnlySnapshotFiltersShadowAndExactCanaryCohortsWithoutLegacyFallback() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            when(fixture.pool.listForUser(7L)).thenReturn(List.of(
+                    new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin", "SPOT", "USDT", true, 1, "USER"),
+                    new AssetPoolAssetDTO(2L, "ETHUSDT", "Ethereum", "SPOT", "USDT", true, 2, "USER")));
+            MockMvc cards = cardMvc(fixture.service);
+            for (var mode : List.of(AssetCardProperties.ModelMode.LEGACY, AssetCardProperties.ModelMode.SHADOW)) {
+                fixture.properties.setModelMode(mode);
+                cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                                .param("symbols", "ETHUSDT", "BTCUSDT"))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+            }
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+            fixture.properties.setEnabled(false);
+            cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                            .param("symbols", "ETHUSDT", "BTCUSDT"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+            verifyNoInteractions(fixture.mapper, fixture.market);
+
+            fixture.properties.setEnabled(true);
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.CANARY);
+            fixture.properties.setCanarySymbols(java.util.Set.of("BTCUSDT"));
+            cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                            .param("symbols", "ETHUSDT", "BTCUSDT"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].symbol").value("BTCUSDT"))
+                    .andExpect(jsonPath("$.data[0].signal.status").value("INSUFFICIENT_DATA"))
+                    .andExpect(jsonPath("$.data[0].signal.calibratedConfidence").isEmpty());
+            verify(fixture.mapper).selectSnapshotJson("BTCUSDT");
+            verify(fixture.market).quote(org.mockito.ArgumentMatchers.eq("BTCUSDT"),
+                    org.mockito.ArgumentMatchers.any(java.time.Instant.class));
+            verify(fixture.pool, times(4)).listForUser(7L);
+            verifyNoMoreInteractions(fixture.mapper, fixture.market, fixture.pool);
+            verifyNoInteractions(dashboardHomeService, fixture.events);
+        }
+    }
+
+    @Test
+    void installedCardServiceDoesNotReplaceDefaultHomeOrRuntimeSnapshotRouting() throws Exception {
+        AssetCardService cards = mock(AssetCardService.class);
+        DashboardHomeVO home = new DashboardHomeVO();
+        DashboardHomeVO.AssetVO first = new DashboardHomeVO.AssetVO();
+        first.setRawSymbol("BTCUSDT");
+        first.setMarketBias("WEAK_BEARISH");
+        first.setFinalConfidence(51);
+        first.setRiskLevel("MEDIUM");
+        first.setOpportunityScore(94);
+        first.setCardSignalDisplayEnabled(true);
+        first.setCardSignal(AssetCardSnapshot.unavailable("BTCUSDT", "Bitcoin", "TEST_FIXTURE"));
+        DashboardHomeVO.AssetVO second = new DashboardHomeVO.AssetVO();
+        second.setRawSymbol("ETHUSDT");
+        second.setOpportunityScore(83);
+        home.setAssets(List.of(first, second));
+        home.setAssetPool(List.of(second, first));
+        when(dashboardHomeService.getHomeForUser(7L, null, null, null)).thenReturn(home);
+
+        MockMvc installed = cardMvc(cards);
+        for (String path : List.of("/api/dashboard/home", "/api/dashboard/runtime-snapshot")) {
+            installed.perform(get(path).param("ownerId", "999").param("userId", "999"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.assets[0].rawSymbol").value("BTCUSDT"))
+                    .andExpect(jsonPath("$.data.assets[0].marketBias").value("WEAK_BEARISH"))
+                    .andExpect(jsonPath("$.data.assets[0].finalConfidence").value(51))
+                    .andExpect(jsonPath("$.data.assets[0].riskLevel").value("MEDIUM"))
+                    .andExpect(jsonPath("$.data.assets[0].opportunityScore").value(94))
+                    .andExpect(jsonPath("$.data.assets[0].cardSignal.signal.status").value("INSUFFICIENT_DATA"))
+                    .andExpect(jsonPath("$.data.assets[0].cardSignalDisplayEnabled").value(true))
+                    .andExpect(jsonPath("$.data.assets[1].rawSymbol").value("ETHUSDT"))
+                    .andExpect(jsonPath("$.data.assets[1].cardSignalDisplayEnabled").value(false))
+                    .andExpect(jsonPath("$.data.assetPool[0].rawSymbol").value("ETHUSDT"))
+                    .andExpect(jsonPath("$.data.assetPool[1].rawSymbol").value("BTCUSDT"));
+        }
+        verify(dashboardHomeService, times(2)).getHomeForUser(7L, null, null, null);
+        verifyNoInteractions(cards);
+    }
+
+    private MockMvc cardMvc(AssetCardService cards) {
+        var controller = new DashboardHomeController(dashboardHomeService, authenticatedUserIdResolver);
+        controller.setAssetCardService(cards);
+        return MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    /** Real request-facing service with only local test doubles; never starts background workers. */
+    private static final class CardReadFixture implements AutoCloseable {
+        final AssetPoolService pool = mock(AssetPoolService.class);
+        final AssetCardMapper mapper = mock(AssetCardMapper.class);
+        final AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
+        final DashboardLiveEventService events = mock(DashboardLiveEventService.class);
+        final AssetCardProperties properties = new AssetCardProperties();
+        final AssetCardService service;
+        CardReadFixture() {
+            properties.setEnabled(true);
+            properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+            service = new AssetCardService(properties, market, mapper, pool, events, new ObjectMapper().findAndRegisterModules());
+        }
+        @Override public void close() { service.close(); }
     }
 
     @Test

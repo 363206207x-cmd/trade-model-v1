@@ -18,6 +18,20 @@ public class DashboardHomeController {
     private final DashboardHomeService dashboardHomeService;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
     private DashboardLiveEventService dashboardLiveEventService;
+    private org.example.trademodel.assetcard.AssetCardService assetCardService;
+
+    @Autowired(required = false)
+    void setAssetCardService(org.example.trademodel.assetcard.AssetCardService value) {
+        this.assetCardService = value;
+    }
+
+    @GetMapping(path = "/runtime-snapshot", params = "view=ASSET_CARDS")
+    public ApiResponse<java.util.List<org.example.trademodel.assetcard.AssetCardSnapshot>> cards(
+            @RequestParam("symbols") java.util.List<String> symbols) {
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        if (assetCardService == null) throw new IllegalStateException("ASSET_CARD_READ_SERVICE_UNAVAILABLE");
+        return ApiResponse.success(assetCardService.snapshotsForUser(userId, symbols));
+    }
 
     public DashboardHomeController(DashboardHomeService dashboardHomeService,
                                    AuthenticatedUserIdResolver authenticatedUserIdResolver) {
