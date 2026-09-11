@@ -153,6 +153,33 @@
 
     <profiles>
         <profile>
+            <id>asset-card-native-evidence</id>
+            <build>
+                <plugins>
+                    <!-- Candidate provenance only; never collect user, remote or environment metadata. -->
+                    <plugin>
+                        <groupId>io.github.git-commit-id</groupId>
+                        <artifactId>git-commit-id-maven-plugin</artifactId>
+                        <configuration>
+                            <verbose>false</verbose>
+                            <offline>true</offline>
+                            <!-- Native git resolves the current linked worktree; JGit may select the main checkout. -->
+                            <useNativeGit>true</useNativeGit>
+                            <commitIdGenerationMode>full</commitIdGenerationMode>
+                            <includeOnlyProperties>
+                                <includeOnlyProperty>^git\.commit\.id\.full$</includeOnlyProperty>
+                                <includeOnlyProperty>^git\.dirty$</includeOnlyProperty>
+                            </includeOnlyProperties>
+                            <injectIntoSysProperties>false</injectIntoSysProperties>
+                            <useBranchNameFromBuildEnvironment>false</useBranchNameFromBuildEnvironment>
+                            <failOnNoGitDirectory>true</failOnNoGitDirectory>
+                            <failOnUnableToExtractRepoInfo>true</failOnUnableToExtractRepoInfo>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>smoke</id>
             <properties>
                 <surefire.includeTags>smoke</surefire.includeTags>

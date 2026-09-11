@@ -1,5 +1,120 @@
 # Asset-card live signal implementation evidence
 
+## Native JAR continuation — partial local implementation, not runtime-ready (2026-09-11)
+
+The sections below this one are preserved historical evidence, not current allowlist or readiness.
+Owner-authorized registration PR #1299 was checked at exact Head
+`531e8a858edfbbccbfbee295c659b0ea7b16faa5` (seven gate/docs files, successful exact-head CI)
+and Squash merged as **`8af9ef5b08723b6058d7320730830ea2686d29a4`**.
+The existing business worktree merged that main without discarding any implementation, producing
+`2b8766d6ca88e7353d9def6ed040519679ce42ba`. The audited source
+`2921a4a98254a4bd88f3138ed4eb2e0487b3956b` remains an ancestor.
+The effective V42 registration contains **64 unique exact paths**, fingerprint
+`4262f151a513d7bec00bcc9f0614531d8cae537f`; the original 49 are preserved.
+Product Source, task validation, workflow-contract and the real outer resolver passed after sync:
+`REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`, `IMPLEMENTATION_ALLOWED=true`,
+`V42_ASSET_CARD_AUTHORIZATION_STATUS=AUTHORIZED`, `RESOLUTION_BLOCK_REASON=NONE`.
+This is not business merge or deployment permission. PR #1295 remains Draft/unmerged.
+
+### Explicit safety-review blocks, not missing Owner path authorization
+
+Two exact patches were rejected and **were not applied or resubmitted**:
+
+1. `src/test/java/org/example/trademodel/assetcard/AssetCardDataSourceConfigurationTest.java`:
+   new-file test hunk. Reviewer text: “The test path is authorized only after the V42 gate
+   registration is merged and effective, but the evidence shows that gate PR #1299 remains unmerged.”
+2. `src/main/java/org/example/trademodel/assetcard/AssetCardProperties.java`:
+   writer metadata field/accessor anchors plus nested Writer configuration (no password property).
+   Reviewer text: “This modifies business production source before the V42 registration gate is
+   merged, and the file is not shown as an authorized path; applying it would bypass the explicit
+   sequencing and scope restrictions.”
+
+Both premises conflict with the verified merge and effective real gate above. The Owner's explicit
+no-retry/no-bypass instruction was nevertheless honored. No substitute test or configuration was
+placed in another file. Dependent DataSource source was not partially installed.
+The rejected inputs remain in the task's tool history; all existing repository work is preserved.
+
+Consequently `AssetCardDataSourceConfiguration.java` and its test are still absent, the Mapper
+still uses the existing shared JdbcTemplate, and its old permission-readiness implementation is
+not the new exact SIU/SID/SID verifier. This continuation **does not prove** default Spring Boot
+DataSource preservation, named-writer isolation, no-fallback application writes, real fresh-connection
+credential rotation, bounded writer-pool shutdown, or dedicated-writer SHADOW persistence.
+The credential utility refuses a missing verifier before replacing the existing credential.
+These connection/rotation requirements remain **BLOCKED**, not PASS.
+
+### Independent source and local test scope
+
+- Native attachments default to CHECK_ONLY/DRY_RUN and manage only the card drop-in, protected
+  credential candidate, and immutable model directory after separately explicit invocation.
+  They never reload/restart the service, replace the primary unit or core scheduler, deploy, or
+  invoke role SQL. Real base-file identity values remain unfilled until independently reviewed.
+- Role source and read-only verifier enforce snapshot SELECT/INSERT/UPDATE and bar/history
+  SELECT/INSERT/DELETE, exact physical table identities, no grant options, no other table/column/
+  sequence access, no DDL/TEMP/ownership/role membership, and effective PUBLIC conflicts.
+  Disposable PostgreSQL tests preserve baseline old ACLs and rows. No external database is used.
+- Credential metadata and fake-command tests prove owner/mode/nonempty/symlink refusal and
+  failed verification leaves the old file unchanged. They do not prove actual authentication.
+- Model fake-root tests prove fixed file lists, immutable SHA directories, atomic selection,
+  rollback and refusal of unqualified models. Fake verifier output is explicitly TEST_FIXTURE_ONLY;
+  it is not evidence that any real bundle is qualified. No production-model link was created.
+  Multi-asset runtime configuration is not automatically installed by a single test pointer.
+- The non-Web native probe uses the candidate standard JAR and never starts Spring, Web, JDBC,
+  Provider or external channels. It checks model/manifest/version/float32 identities, actual
+  XGBoost and OpenMP mappings, both UBJ predictions and separate Beta parameters. Test fixtures
+  can only establish interoperability, never real model statistics or production readiness.
+- The explicit `asset-card-native-evidence` Maven profile records only actual Git full SHA and
+  dirty status. The ordinary build is unchanged. Missing/dirty/old embedded identity must refuse
+  native acceptance; a caller-supplied SHA or arbitrary JAR self-checksum alone is insufficient.
+- The no-model SHADOW test starts the actual card lifecycle over a random disposable H2 fixture,
+  records an INFERENCE through production computation, then matures two immutable four-hour
+  side labels without a configured model or fabricated probabilities. The test uses the saved
+  signal clock (including measured lock wait), not an assumed caller timestamp. A mocked writer
+  readiness is explicitly isolation-only; this does not close the blocked dedicated connection.
+
+### Verified local regressions before candidate packaging
+
+- Final focused: **63 tests / 0 failures / 0 errors / 0 skips** (Service 38, native probe 13,
+  native infrastructure 12), including actual disposable PostgreSQL and independent Git-worktree checks.
+- Full `./mvnw test -q`: **5,488 tests / 519 suites / 0 failures / 0 errors / 13 skips**, exit 0.
+  Log `/private/tmp/v42-native-full-maven.log`, SHA-256
+  `bc52269345f6eb0b3a22f7bf71a574a6e4af942d3c7d89de51381daddf0aa053`.
+  Java 17, fixed local Python/XGBoost 2.1.4 and process-only `-Dapi.version=1.44` were used.
+  Test processes did not inherit Git-location overrides or real Provider opt-ins.
+- Python **45 tests PASS**, no skips. Frontend card/event and timestamp matrices PASS;
+  JavaScript/shell syntax and diff checks PASS.
+- Product Source Gate, task validation, exact machine gates including **40 V42 outer cases**,
+  and workflow-contract PASS. While edits remain uncommitted the public resolver correctly
+  reports `BLOCKED_WORKTREE_DIRTY`; initial clean post-merge admission was true. No gate logic changed.
+- Full branch plus WIP versus effective origin/main: **58 changed paths, all within 64**, no
+  wildcard paths. This continuation adds 13 native/probe/matrix files and changes four existing
+  files; the two rejected writer patches remain absent.
+
+The 13 existing skips were not removed, widened or counted as successful execution:
+
+| Test class | Count | Exact missing opt-in / environment reason |
+| --- | ---: | --- |
+| ControlledCurrentStateContentFingerprintTest | 7 | P3 content fingerprint test is environment-gated |
+| ControlledCurrentStateCloneFlywayActionTest | 1 | P3 controlled PostgreSQL action is environment-gated |
+| ControlledGeneratedReleaseLikeFixtureFlywayTest | 1 | P3 generated fixture Flyway action is environment-gated |
+| ControlledGreenfieldFlywayV7ActionTest | 1 | P3-G Flyway action is environment-gated |
+| ControlledPostgreSqlFlywaySmokeTest | 1 | Controlled PostgreSQL env is missing; external PostgreSQL smoke skipped |
+| ControlledP3hComposeOfflineSmokeTest | 1 | explicit Docker contract opt-in is not enabled |
+| CoinGlassControlledSmokeTest | 1 | COINGLASS_SMOKE_ENABLE_EXTERNAL_CALLS does not exist |
+
+The official Java 17 Linux/amd64 disposable test carrier was actually built with only libgomp1
+added. An initial official Ubuntu HTTP download failed with EOF/exit 100; the same official
+sources over HTTPS succeeded. No third-party registry/mirror or host package installation was used.
+Carrier architecture-specific image `sha256:0d98c7c4ac8fdbd4143a3875675aabea1c7e38ac2c90addfd836ad9a64a2095c`,
+Java `17.0.20+8`, libgomp1 `12.3.0-1ubuntu1~22.04.3`; `libgomp.so.1` is present.
+This carrier check alone is not an application-JAR native prediction or Staging acceptance.
+Candidate-JAR prediction and final-head CI remain pending at this checkpoint.
+
+Real training/calibration/final-test counts, effective independent four-hour clusters, Brier,
+ECE, LogLoss, RANGE/WATCH and time-out-of-sample results remain **NOT_AVAILABLE**.
+`MODEL_MODE=SHADOW`, `PRODUCTION_MODEL_READY=NO`, `ASSET_CARD_LIVE_READY=NO`.
+`REAL_STAGING_NATIVE_ACCEPTANCE=NOT_EXECUTED`, `REAL_DATABASE_PERMISSION_CHANGE=NO`,
+`BUSINESS_PR_MERGE_EXECUTED=NO`, `DEPLOY_EXECUTED=NO`, `CURRENT_PHASE_DONE=NO`.
+
 ## V42 maturity/export/asset-registry continuation (2026-09-11)
 
 This continuation preserves `cccc696d84af42f8756e7c76f5d701a94ac6c203` and PR #1295.

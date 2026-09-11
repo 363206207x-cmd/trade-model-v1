@@ -9,10 +9,53 @@ import json
 import tempfile
 import io
 import contextlib
+import sys
+import struct
+import re
 
 SPEC = importlib.util.spec_from_file_location("asset_card_model", pathlib.Path(__file__).with_name("asset_card_model.py"))
 model = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(model)
+
+
+def generate_native_fixture(output,candidate_sha,jar_sha256):
+    """Explicit, disposable interoperability data; deliberately NOT a production bundle."""
+    if not re.fullmatch(r"[0-9a-f]{40}",candidate_sha) or not re.fullmatch(r"[0-9a-f]{64}",jar_sha256):
+        raise ValueError("Explicit candidate and JAR checksums required")
+    root=pathlib.Path(output)
+    if root.exists() or root.is_symlink(): raise ValueError("Refusing to overwrite fixture directory")
+    import numpy as np
+    import xgboost as xgb
+    if xgb.__version__!=model.XGBOOST_VERSION: raise ValueError("Fixed XGBoost version required")
+    width=len(model.FEATURE_NAMES)
+    data=np.zeros((40,width),dtype=np.float32); data[:,0]=np.arange(40,dtype=np.float32)
+    inputs=data[[0,19,39]].copy()
+    # This missing value also exercises the common float32/NaN representation.
+    inputs[0,-1]=np.nan
+    result={"schemaVersion":1,"kind":"TEST_FIXTURE_ONLY","productionModelReady":False,
+            "candidateSha":candidate_sha,"jarSha256":jar_sha256,"targetOs":"Linux","targetArch":"x86_64",
+            "javaMajor":17,"xgboostVersion":model.XGBOOST_VERSION,"featureVersion":model.FEATURE_VERSION,
+            "featureNames":model.FEATURE_NAMES,"maxAbsoluteError":1e-7,
+            "float32Rows":[["7fc00000" if np.isnan(value) else struct.pack("!f",float(value)).hex() for value in row] for row in inputs],"models":{}}
+    root.mkdir(mode=0o700)
+    for side,cutoff in (("LONG",20),("SHORT",12)):
+        labels=np.asarray([i>=cutoff if side=="LONG" else i<cutoff for i in range(40)],dtype=np.float32)
+        training=xgb.DMatrix(data,label=labels,feature_names=model.FEATURE_NAMES,missing=np.nan)
+        booster=xgb.train({"objective":"binary:logistic","device":"cpu","nthread":1,"max_depth":2,"eta":.2,"seed":7,"verbosity":0},training,num_boost_round=4)
+        calibration=model.fit_beta(booster.predict(training).tolist(),labels.tolist())
+        model_version="TEST_FIXTURE_"+side+"_MODEL_V1"; calibration_version="TEST_FIXTURE_"+side+"_BETA_V1"
+        booster.set_attr(asset_card_data_kind="TEST_FIXTURE_ONLY",asset_card_side=side,
+                         asset_card_model_version=model_version,asset_card_calibration_version=calibration_version,
+                         asset_card_feature_version=model.FEATURE_VERSION)
+        filename=side.lower()+".ubj"; booster.save_model(root/filename)
+        # Reload the exact serialized UBJ being passed to Java, not an in-memory substitute.
+        loaded=xgb.Booster(); loaded.load_model(root/filename)
+        raw=loaded.predict(xgb.DMatrix(inputs,feature_names=model.FEATURE_NAMES,missing=np.nan)).tolist()
+        result["models"][side]={"file":filename,"sha256":model.sha256(root/filename),"modelVersion":model_version,
+                                "calibrationVersion":calibration_version,"calibration":calibration,
+                                "expectedRaw":raw,"expectedCalibrated":[model.beta(value,calibration) for value in raw]}
+    (root/"native-fixture.json").write_text(json.dumps(result,sort_keys=True,allow_nan=False)+"\n",encoding="utf-8")
+    return result
 
 
 class ModelTests(unittest.TestCase):
@@ -378,6 +421,35 @@ class ModelTests(unittest.TestCase):
             model.fit_beta([.1,.2,.8,.9],[1,1,0,0])
 
 
+class NativeInteropFixtureTests(unittest.TestCase):
+    def test_fixture_is_dual_ubj_float32_checksums_and_not_a_production_bundle(self):
+        import struct
+        with tempfile.TemporaryDirectory(prefix="asset-card-native-unit-") as folder:
+            root=pathlib.Path(folder)/"fixture"
+            result=generate_native_fixture(root,"a"*40,"b"*64)
+            self.assertEqual(result["kind"],"TEST_FIXTURE_ONLY")
+            self.assertFalse(result["productionModelReady"])
+            self.assertFalse((root/"manifest.json").exists())
+            self.assertEqual(result["featureNames"],model.FEATURE_NAMES)
+            self.assertEqual(set(p.name for p in root.iterdir()),{"native-fixture.json","long.ubj","short.ubj"})
+            self.assertNotEqual(result["models"]["LONG"]["sha256"],result["models"]["SHORT"]["sha256"])
+            for side in ("LONG","SHORT"):
+                spec=result["models"][side]
+                self.assertEqual(model.sha256(root/spec["file"]),spec["sha256"])
+                self.assertEqual(len(spec["expectedRaw"]),len(result["float32Rows"]))
+                for raw,calibrated in zip(spec["expectedRaw"],spec["expectedCalibrated"]):
+                    self.assertEqual(model.beta(raw,spec["calibration"]),calibrated)
+            self.assertTrue(all(len(row)==len(model.FEATURE_NAMES) for row in result["float32Rows"]))
+            self.assertEqual(struct.unpack("!f",bytes.fromhex(result["float32Rows"][1][0]))[0],19)
+            with self.assertRaises(ValueError): generate_native_fixture(root,"a"*40,"b"*64)
+
+    def test_fixture_refuses_unknown_candidate_or_jar_identity_before_writing(self):
+        with tempfile.TemporaryDirectory(prefix="asset-card-native-unit-") as folder:
+            root=pathlib.Path(folder)/"fixture"
+            with self.assertRaises(ValueError): generate_native_fixture(root,"not-a-sha","b"*64)
+            self.assertFalse(root.exists())
+
+
 class CardExportTests(unittest.TestCase):
     """Synthetic files isolate export validation; real provenance rejection is never bypassed outside these tests."""
     @staticmethod
@@ -592,4 +664,13 @@ class CardExportTests(unittest.TestCase):
                 model.validate_training_manifest(manifest)
 
 
-if __name__ == "__main__": unittest.main()
+if __name__ == "__main__":
+    if len(sys.argv)>1 and sys.argv[1]=="--generate-native-fixture":
+        if len(sys.argv)!=5:
+            print("TEST_FIXTURE_STATUS=FAIL\nCODE=INVALID_ARGUMENTS"); sys.exit(2)
+        try:
+            generate_native_fixture(sys.argv[2],sys.argv[3],sys.argv[4])
+            print("TEST_FIXTURE_STATUS=PASS\nDATA_KIND=TEST_FIXTURE_ONLY\nPRODUCTION_MODEL_READY=NO")
+        except Exception:
+            print("TEST_FIXTURE_STATUS=FAIL\nCODE=FIXTURE_GENERATION_FAILED\nPRODUCTION_MODEL_READY=NO"); sys.exit(1)
+    else: unittest.main()

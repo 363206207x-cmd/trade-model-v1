@@ -1,0 +1,27 @@
+# Non-secret identity document. Fill from independently reviewed external-base evidence.
+# Never source this file. Placeholders intentionally fail closed; never hash a credential.
+MANIFEST_KIND=NATIVE_SYSTEMD_JAR_RUNTIME
+TARGET_ARCH=x86_64
+SERVICE_NAME=rine-logic.service
+APP_JAR=/opt/rine-logic/current/app.jar
+APP_JAR_SHA256=REPLACE_JAR_SHA256
+MAIN_UNIT=/etc/systemd/system/rine-logic.service
+MAIN_UNIT_SHA256=REPLACE_MAIN_UNIT_SHA256
+SCHEDULER_DROPIN=/etc/systemd/system/rine-logic.service.d/20-core-loop-schedulers.conf
+SCHEDULER_DROPIN_SHA256=REPLACE_SCHEDULER_SHA256
+READY_SCRIPT=/usr/local/sbin/rine-logic-wait-ready
+READY_SCRIPT_SHA256=REPLACE_READY_SHA256
+RELEASE_METADATA=/opt/rine-logic/release-metadata.json
+RELEASE_METADATA_FORMAT=REPLACE_RELEASE_METADATA_FORMAT
+RELEASE_METADATA_SHA256=REPLACE_RELEASE_METADATA_SHA256
+MODEL_ROOT=/opt/rine-logic/models/asset-card
+CARD_DROPIN=/etc/systemd/system/rine-logic.service.d/40-asset-card.conf
+CREDENTIAL_SOURCE=/etc/rine-logic/credentials/asset-card-db-password
+CREDENTIAL_ID=asset-card-db-password
+ROOT_UID=REPLACE_ROOT_UID
+SERVICE_UID=REPLACE_SERVICE_UID
+WRITER_JDBC_URL=REPLACE_NON_SECRET_JDBC_URL
+EXPECTED_DATABASE=REPLACE_DATABASE_NAME
+WRITER_ROLE=rine_asset_card_writer
+MODEL_MODE=SHADOW
+PRODUCTION_MODEL_READY=NO
