@@ -174,6 +174,16 @@ check (zero matches) pass. Product Source, task validation, workflow-contract
 and exact machine self-tests pass, including 40 V42 outer cases. All 23 changed
 paths belong to the unchanged 64-path list; no wildcard or gate-owner edits.
 
+The first follow-up Head `905e941c1b5beca6aa0de481c38e1f0b706789be`
+failed required CI run `34621655003` at synthetic tmpfs initialization (mount
+errno13), before the real credential assertions. Docker's default AppArmor
+profile denies that mount independently of SYS_ADMIN. The correction is only
+the disposable, network-disabled, no-host-mount test container's AppArmor option;
+host, server, production unit and credential validation policies are unchanged.
+The reader still runs as UID999 with empty supplementary groups and zero
+effective/permitted/ambient capabilities. All positive and rejection assertions
+remain mandatory in Linux CI; the failed run is not acceptance evidence.
+
 ## V42 unified finite-SHADOW execution package — 2026-09-11 follow-up
 
 本节取代下方历史预检中的“仅人工停采集”“归档没有生产调用者”和“旧JAR回滚待验证”三个未完成结论；历史数据盘点、服务器身份和历史测试结果原样保留。**本轮仅实现、隔离测试、提交与推送；本节所有真实执行命令仍待 Owner 对这一份执行包统一批准。** 不合并、不安装、不授予真实权限、不联网探测或采集、不训练。

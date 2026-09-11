@@ -107,10 +107,13 @@ class AssetCardDataSourceConfigurationTest {
                     """);
         // No host mounts, socket or network. SYS_ADMIN is only for this disposable namespace's tmpfs.
         // Docker's local-volume option parser does not support MS_NOSYMFOLLOW, so use the Linux syscall.
+        // docker-default AppArmor denies mount even with SYS_ADMIN. Only this no-network,
+        // no-host-mount synthetic fixture opts out; no host or deployment policy is changed.
         try (var runtime = new org.testcontainers.containers.GenericContainer<>(image)
                 .withNetworkMode("none")
                 .withCreateContainerCmdModifier(command -> command.getHostConfig()
-                        .withCapAdd(com.github.dockerjava.api.model.Capability.SYS_ADMIN))
+                        .withCapAdd(com.github.dockerjava.api.model.Capability.SYS_ADMIN)
+                        .withSecurityOpts(java.util.List.of("apparmor=unconfined")))
                 .withCommand("/usr/bin/python3", "-I", "-S", "-B", "-c", "import time; print('READY',flush=True); time.sleep(180)")
                 .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forLogMessage(".*READY.*", 1))) {
                 copyCredentialProbe(runtime);
