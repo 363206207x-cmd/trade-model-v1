@@ -167,7 +167,67 @@ public class AssetCardMapper {
             throw new IllegalArgumentException("Labels require a real signal trade, explicit side and mature four-hour horizon");
         String key = identityKey("LABEL", signalAsOf.toString(), instrumentId, sourceVersion, Long.toString(signalTradeId),
                 featureVersion, labelDefinition, side);
-        return saveHistory(symbol, HistoryKind.LABEL, key, signalAsOf, availableAt, json);
+        int inserted = saveHistory(symbol, HistoryKind.LABEL, key, signalAsOf, availableAt, json);
+        if (inserted == 0) {
+            var existing = selectHistoryRecord(symbol, HistoryKind.LABEL, key).orElseThrow();
+            // Payload carries the exact immutable maturity clock; JDBC timestamp precision must not create false conflicts.
+            if (!existing.payloadJson().equals(json))
+                throw new IllegalStateException("ASSET_CARD_IMMUTABLE_LABEL_CONFLICT");
+        }
+        return inserted;
+    }
+
+    public Optional<TypedHistory> selectHistoryRecord(String symbol, HistoryKind kind, String key) {
+        requireSymbol(symbol); Objects.requireNonNull(kind); Objects.requireNonNull(key);
+        return jdbc.query("SELECT * FROM tm_asset_card_feature_history WHERE symbol=? AND record_kind=? AND record_key=?",
+                (rs, row) -> typedHistory(rs), symbol, kind.name(), key).stream().findFirst();
+    }
+
+    /** Resume across a bounded page without silently truncating a training export or starving newer inference records. */
+    public List<TypedHistory> selectHistoryPage(String symbol, HistoryKind kind, Instant fromInclusive, Instant toExclusive,
+                                              Instant cutoff, Instant afterAt, String afterKey, int limit) {
+        requireSymbol(symbol); Objects.requireNonNull(kind); Objects.requireNonNull(fromInclusive);
+        Objects.requireNonNull(toExclusive); Objects.requireNonNull(cutoff);
+        if (!fromInclusive.isBefore(toExclusive) || (afterAt == null) != (afterKey == null))
+            throw new IllegalArgumentException("Exact ordered history interval/cursor required");
+        Instant cursorAt = afterAt == null ? fromInclusive : afterAt;
+        String cursorKey = afterKey == null ? "" : afterKey;
+        return jdbc.query("""
+                SELECT * FROM tm_asset_card_feature_history WHERE symbol=? AND record_kind=?
+                AND signal_as_of>=? AND signal_as_of<? AND available_at<=?
+                AND (signal_as_of>? OR (signal_as_of=? AND record_key>?))
+                ORDER BY signal_as_of,record_key LIMIT ?
+                """, (rs, row) -> typedHistory(rs), symbol, kind.name(), utc(fromInclusive), utc(toExclusive), utc(cutoff),
+                utc(cursorAt), utc(cursorAt), cursorKey, bounded(limit));
+    }
+
+    /** Includes unsubscribed symbols: page visibility and subscription churn cannot stop already-open label horizons. */
+    public List<String> selectInferenceSymbols() {
+        return jdbc.query("SELECT DISTINCT symbol FROM tm_asset_card_feature_history WHERE record_kind='INFERENCE' ORDER BY symbol",
+                (rs, row) -> rs.getString(1));
+    }
+
+    public List<SpotBar> selectLabelBars(String symbol, String interval, Instant from, Instant to, Instant cutoff) {
+        requireSymbol(symbol);
+        if (!Set.of("1m", "5m").contains(interval) || !from.isBefore(to) || Duration.between(from,to).compareTo(Duration.ofHours(5)) > 0)
+            throw new IllegalArgumentException("Only the exact card label horizon is readable");
+        return jdbc.query("""
+                SELECT * FROM tm_asset_card_spot_bar WHERE symbol=? AND interval_code=?
+                AND open_time>=? AND open_time<? AND close_time<=? AND available_at<=? ORDER BY open_time
+                """, (rs, row) -> new SpotBar(rs.getString("symbol"), rs.getString("interval_code"),
+                instant(rs,"open_time"),instant(rs,"close_time"),rs.getBigDecimal("open_price"),rs.getBigDecimal("high_price"),
+                rs.getBigDecimal("low_price"),rs.getBigDecimal("close_price"),rs.getBigDecimal("volume"),
+                rs.getBigDecimal("taker_buy_base_volume"),rs.getObject("trade_count",Long.class),instant(rs,"available_at")),
+                symbol,interval,utc(from),utc(to),utc(cutoff),utc(cutoff));
+    }
+
+    public Optional<TypedHistory> selectHorizonTrade(String symbol, Instant from, Instant end) {
+        requireSymbol(symbol);
+        return jdbc.query("""
+                SELECT * FROM tm_asset_card_feature_history WHERE symbol=? AND record_kind='TRADE'
+                AND signal_as_of>=? AND signal_as_of<=? AND available_at<=?
+                ORDER BY signal_as_of DESC,record_key DESC LIMIT 1
+                """, (rs, row) -> typedHistory(rs), symbol,utc(from),utc(end),utc(end)).stream().findFirst();
     }
 
     private int saveHistory(String symbol, HistoryKind kind, String recordKey, Instant observedAt, Instant availableAt, String json) {

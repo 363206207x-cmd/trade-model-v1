@@ -22,7 +22,7 @@ import java.util.concurrent.*;
 
 /** Background card owner. All request-facing methods below are strictly read-only. */
 @Service
-public class AssetCardService {
+public class AssetCardService implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AssetCardService.class);
     private final AssetCardProperties properties;
     private final AssetCardMarketDataService market;
@@ -34,7 +34,7 @@ public class AssetCardService {
     private final AssetCardFeatureService featureBuilder = new AssetCardFeatureService();
     private final AssetCardSignalService signals = new AssetCardSignalService();
     private final AssetCardRiskService risks = new AssetCardRiskService();
-    private volatile AssetCardModelBundle model = AssetCardModelBundle.unavailable("MODEL_NOT_CONFIGURED");
+    private final AssetCardModelBundle.Registry modelRegistry = new AssetCardModelBundle.Registry();
     private final Map<String, AssetCardFeatureService.Frame> featureFrames = new ConcurrentHashMap<>();
     private final Map<String, AssetCardFeatureService.Frame> signalFrames = new ConcurrentHashMap<>();
     private final Map<String, AssetCardSignalService.State> signalStates = new ConcurrentHashMap<>();
@@ -54,6 +54,11 @@ public class AssetCardService {
     });
     private final Map<String, AssetCardSnapshot> snapshots = new ConcurrentHashMap<>();
     private volatile boolean writerReady;
+    private final Map<String, AssetCardMapper.TypedHistory> labelCursors = new ConcurrentHashMap<>();
+    private final Map<String, String> labelStatuses = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService labelWorker = Executors.newSingleThreadScheduledExecutor(task -> {
+        Thread thread = new Thread(task, "asset-card-label-maturity"); thread.setDaemon(true); return thread;
+    });
     private final Map<String, AssetCardMarketDataService.SpotQuote> pendingTrades = new ConcurrentHashMap<>();
     private enum Field { PRICE, SIGNAL, RISK, PERSISTENCE, RECOVERY }
     private final Map<Field, Map<String, String>> fieldFailures = new EnumMap<>(Field.class);
@@ -78,7 +83,7 @@ public class AssetCardService {
     private void failed(Field field, String symbol, String reason) { fieldFailures.get(field).put(symbol, reason); }
     private void healthy(Field field, String symbol) { fieldFailures.get(field).remove(symbol); }
     private String failure(Field field, String symbol) { return fieldFailures.get(field).get(symbol); }
-    private String riskVersion() { return model.riskVersion() == null ? AssetCardRiskService.RULE_VERSION : model.riskVersion(); }
+    private static String riskVersion(AssetCardModelBundle model) { return model.riskVersion() == null ? AssetCardRiskService.RULE_VERSION : model.riskVersion(); }
 
     @org.springframework.beans.factory.annotation.Autowired
     public void setEvidenceService(AssetCardEvidenceService evidence) { this.evidence = evidence; }
@@ -87,8 +92,7 @@ public class AssetCardService {
     public synchronized void start() {
         if (started || !properties.isEnabled()) return;
         started = true;
-        if (properties.getModelBundlePath() != null && !properties.getModelBundlePath().isBlank())
-            model = AssetCardModelBundle.load(Path.of(properties.getModelBundlePath()), properties.getModelBundleSha256());
+        reconcileModelsSafely();
         refreshWriterReadiness();
         market.setWriterReadiness(() -> writerReady);
         market.addListener(this::onMarketUpdate);
@@ -97,8 +101,61 @@ public class AssetCardService {
         background.scheduleWithFixedDelay(this::flushPrices, 500, 500, TimeUnit.MILLISECONDS);
         riskWorkers.scheduleWithFixedDelay(this::enqueueRiskRefreshes, 1, 1, TimeUnit.SECONDS);
         inference.scheduleWithFixedDelay(this::reconcileEvidenceSafely, 0, 60, TimeUnit.SECONDS);
+        inference.scheduleWithFixedDelay(this::reconcileModelsSafely, 60, 60, TimeUnit.SECONDS);
         riskWorkers.scheduleWithFixedDelay(this::flushTradeObservations, 1, 1, TimeUnit.SECONDS);
         riskWorkers.scheduleWithFixedDelay(this::refreshWriterReadiness, 60, 60, TimeUnit.SECONDS);
+        labelWorker.scheduleWithFixedDelay(() -> matureLabels(Instant.now()), 0,
+                Math.max(1, properties.getLabelMaturityInterval().toSeconds()), TimeUnit.SECONDS);
+    }
+
+    /** Only this background owner writes labels; Home/SSE reads never call it. Missing evidence is retried, not fabricated. */
+    void matureLabels(Instant at) {
+        if (!started || !properties.isEnabled() || !writerReady) return;
+        try {
+            var pipeline = new LabelPipeline(mapper, json);
+            for (String symbol : mapper.selectInferenceSymbols()) {
+                try {
+                    var cursor = labelCursors.get(symbol);
+                    var rows = mapper.selectHistoryPage(symbol, AssetCardMapper.HistoryKind.INFERENCE, Instant.EPOCH,
+                            at.minus(Duration.ofHours(4)), at, cursor == null ? null : cursor.signalAsOf(),
+                            cursor == null ? null : cursor.recordKey(), properties.getLabelMaturityBatchSize());
+                    if (rows.isEmpty()) { labelCursors.remove(symbol); continue; }
+                    for (var row : rows) {
+                        var outcome = pipeline.materialize(row, at);
+                        labelStatuses.put(symbol, outcome.status());
+                        if (outcome.record() != null) pipeline.save(row, outcome);
+                        labelCursors.put(symbol, row);
+                    }
+                } catch (RuntimeException failure) {
+                    labelStatuses.put(symbol, "LABEL_EVIDENCE_OR_IMMUTABLE_IDENTITY_FAILURE");
+                    log.warn("[asset-card] Label maturity failed ({})", failure.getClass().getSimpleName());
+                }
+            }
+        } catch (RuntimeException failure) {
+            log.warn("[asset-card] Label scan unavailable ({})", failure.getClass().getSimpleName());
+        }
+    }
+
+    /** Explicit offline export of card-owned immutable records only. No HTTP route, query side effect or network call. */
+    public LabelPipeline.ExportReceipt exportTrainingDataset(String symbol, Instant from, Instant to, Instant cutoff) {
+        if (!properties.isTrainingExportEnabled() || properties.getTrainingExportDirectory() == null)
+            throw new IllegalStateException("ASSET_CARD_EXPORT_NOT_CONFIGURED");
+        return new LabelPipeline(mapper, json).export(normalize(symbol), from, to, cutoff, properties.getTrainingExportDirectory());
+    }
+
+    /** Re-read configuration in background; model loading never runs on a card GET or SSE publication. */
+    void reconcileModelsSafely() {
+        if (!properties.isEnabled()) return;
+        Map<String, AssetCardModelBundle.Source> sources = properties.getModelBundles();
+        if (sources.isEmpty() && properties.getModelBundlePath() != null && !properties.getModelBundlePath().isBlank()) {
+            // Compatibility is restricted to the one asset proved by the legacy bundle, not every subscribed asset.
+            try (var legacy = AssetCardModelBundle.load(Path.of(properties.getModelBundlePath()), properties.getModelBundleSha256())) {
+                if (legacy.validated() && legacy.validatedAssets().size() == 1)
+                    sources = Map.of(legacy.validatedAssets().iterator().next(), new AssetCardModelBundle.Source(
+                            Path.of(properties.getModelBundlePath()), properties.getModelBundleSha256()));
+            } catch (RuntimeException | LinkageError invalid) { sources = Map.of(); }
+        }
+        modelRegistry.reconcile(sources);
     }
 
     private void refreshWriterReadiness() {
@@ -192,19 +249,24 @@ public class AssetCardService {
         long startedNanos = System.nanoTime();
         var identity = new BarIdentity(symbol, closedAt);
         boolean retry = false;
-        try {
-            recoverRuntimeState(symbol, at);
+        try (var lease = modelRegistry.acquire(symbol)) {
+            var model = lease.bundle();
+            recoverRuntimeState(symbol, at, model);
             var completed = signalStates.get(symbol);
             if (completed != null && completed.lastClosed5mAt() != null && !closedAt.isAfter(completed.lastClosed5mAt())) {
                 var current = loadSnapshot(symbol, symbol);
-                publishSignalAndRisk(current, completed.signal(), current.risk(), AssetCardFeatureService.FEATURE_VERSION,
-                        model.modelVersion(), model.calibrationVersion(), at);
+                var completedIdentity = completed.identity();
+                publishSignalAndRisk(current, completed.signal(), current.risk(),
+                        completedIdentity == null ? current.featureVersion() : completedIdentity.featureVersion(),
+                        completedIdentity == null ? current.modelVersion() : completedIdentity.modelVersion(),
+                        completedIdentity == null ? current.calibrationVersion() : completedIdentity.calibrationVersion(),
+                        completedIdentity == null ? current.thresholdVersion() : completedIdentity.thresholdVersion(), at, model);
                 return;
             }
             // Exact persisted closed-bar identity, independent from insertion and processing timestamps.
             var prior = mapper.selectInference(symbol, closedAt, at);
             if (prior != null && prior.isPresent()) {
-                restoreAudit(symbol, prior.get().payloadJson(), at);
+                restoreAudit(symbol, prior.get().payloadJson(), at, model);
                 return;
             }
             Instant deadline = closedAt.plusSeconds(15);
@@ -242,11 +304,11 @@ public class AssetCardService {
                 var anchor = Objects.equals(state.signal().signalAsOf(), frame.signalAsOf()) ? frame : signalFrames.get(symbol);
                 Map<String, Object> audit = payload("rawFrame", raw, "frame", frame, "signalFrame", anchor, "state", state,
                         "closed5mAt", closedAt, "completedAt", completedAt, "outcome", "COMPLETED",
-                        "thresholdVersion", model.thresholdVersion(), "riskVersion", riskVersion(),
+                        "thresholdVersion", model.thresholdVersion(), "riskVersion", riskVersion(model),
                         "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS");
                 if (mapper.saveInference(symbol, closedAt, completedAt, json.writeValueAsString(audit)) != 1) {
                     mapper.selectInference(symbol, closedAt, completedAt).ifPresent(existing -> {
-                        try { restoreAudit(symbol, existing.payloadJson(), completedAt); }
+                        try { restoreAudit(symbol, existing.payloadJson(), completedAt, model); }
                         catch (JsonProcessingException invalid) { throw new IllegalStateException("INVALID_CARD_AUDIT", invalid); }
                     });
                     return;
@@ -255,7 +317,7 @@ public class AssetCardService {
                 if (Objects.equals(state.signal().signalAsOf(), frame.signalAsOf())) signalFrames.put(symbol, frame);
                 var current = loadSnapshot(symbol, symbol);
                 publishSignalAndRisk(current, state.signal(), current.risk(), frame.featureVersion(),
-                        model.modelVersion(), model.calibrationVersion(), completedAt);
+                        model.modelVersion(), model.calibrationVersion(), model.thresholdVersion(), completedAt, model);
                 healthy(Field.SIGNAL, symbol);
             }
         } catch (RuntimeException | JsonProcessingException failure) {
@@ -289,19 +351,23 @@ public class AssetCardService {
     /** Background-only recovery. The persisted snapshot includes private, non-API state so a source-loss
      * invalidation cannot be undone by replaying an earlier inference audit after restart. */
     void recoverRuntimeState(String symbol, Instant at) {
-        synchronized (symbolLock(symbol)) { recoverRuntimeStateLocked(symbol, at); }
+        try (var lease = modelRegistry.acquire(symbol)) { recoverRuntimeState(symbol, at, lease.bundle()); }
     }
 
-    private void recoverRuntimeStateLocked(String symbol, Instant at) {
+    private void recoverRuntimeState(String symbol, Instant at, AssetCardModelBundle model) {
+        synchronized (symbolLock(symbol)) { recoverRuntimeStateLocked(symbol, at, model); }
+    }
+
+    private void recoverRuntimeStateLocked(String symbol, Instant at, AssetCardModelBundle model) {
         if (recovered.contains(symbol)) return;
         try {
             String stored = mapper.selectSnapshotJson(symbol);
             if (stored != null) {
                 var runtime = json.readTree(stored).get("_runtime");
-                if (runtime != null && !runtime.isNull()) restoreAudit(symbol, runtime.toString(), at);
+                if (runtime != null && !runtime.isNull()) restoreAudit(symbol, runtime.toString(), at, model);
             }
             var history = mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.INFERENCE, at.minusSeconds(900), at, at, 32);
-            if (history != null) for (var audit : history) restoreAudit(symbol, audit.payloadJson(), at);
+            if (history != null) for (var audit : history) restoreAudit(symbol, audit.payloadJson(), at, model);
             recovered.add(symbol);
             healthy(Field.RECOVERY, symbol);
         } catch (RuntimeException | JsonProcessingException failure) {
@@ -310,7 +376,7 @@ public class AssetCardService {
         }
     }
 
-    private void restoreAudit(String symbol, String stored, Instant at) throws JsonProcessingException {
+    private void restoreAudit(String symbol, String stored, Instant at, AssetCardModelBundle model) throws JsonProcessingException {
         var node = json.readTree(stored);
         if (!"LIVE_OBSERVED_CARD_INPUTS".equals(node.path("dataKind").asText())) return;
         var frame = json.treeToValue(node.path("frame"), AssetCardFeatureService.Frame.class);
@@ -332,7 +398,7 @@ public class AssetCardService {
             // using the current state (including any newer invalidation), not the replayed audit.
             var current = loadSnapshot(symbol, symbol);
             publishSignalAndRisk(current, previous.signal(), current.risk(), frame.featureVersion(),
-                    model.modelVersion(), model.calibrationVersion(), at);
+                    model.modelVersion(), model.calibrationVersion(), model.thresholdVersion(), at, model);
             return;
         }
         AssetCardFeatureService.Frame anchor = node.path("signalFrame").isNull() || node.path("signalFrame").isMissingNode()
@@ -343,7 +409,7 @@ public class AssetCardService {
         signalStates.put(symbol, state); featureFrames.put(symbol, frame);
         if (anchor != null) signalFrames.put(symbol, anchor);
         var current = loadSnapshot(symbol, symbol);
-        publishSignalAndRisk(current, state.signal(), current.risk(), frame.featureVersion(), model.modelVersion(), model.calibrationVersion(), at);
+        publishSignalAndRisk(current, state.signal(), current.risk(), frame.featureVersion(), model.modelVersion(), model.calibrationVersion(), model.thresholdVersion(), at, model);
     }
 
     private static boolean freshFrame(AssetCardFeatureService.Frame frame, Instant at) {
@@ -436,12 +502,14 @@ public class AssetCardService {
     }
 
     void refreshRisk(String symbol, Instant at) {
-        synchronized (symbolLock(symbol)) { refreshRiskLocked(symbol, at); }
+        try (var lease = modelRegistry.acquire(symbol)) {
+            synchronized (symbolLock(symbol)) { refreshRiskLocked(symbol, at, lease.bundle()); }
+        }
     }
 
-    private void refreshRiskLocked(String symbol, Instant at) {
+    private void refreshRiskLocked(String symbol, Instant at, AssetCardModelBundle model) {
         if (!properties.isEnabled() || started && !writerReady) return;
-        recoverRuntimeState(symbol, at);
+        recoverRuntimeState(symbol, at, model);
         var current = loadSnapshot(symbol, symbol);
         var frame = featureFrames.get(symbol);
         var anchor = signalFrames.get(symbol);
@@ -465,15 +533,15 @@ public class AssetCardService {
         var event = evidence == null ? null : evidence.readEventRisk(symbol, at);
         var signal = current.signal();
         var side = signal.direction() == null ? AssetCardSnapshot.SignalSide.NON_DIRECTIONAL : signal.direction().signalSide();
-        var result = risks.evaluate(new AssetCardRiskService.Input(symbol, at, side, signal.direction(), signal.signalAsOf(), riskVersion(), metrics,
-                model.validatedAt(at) ? model.riskDistributions(symbol, side.name()) : Map.of(), event, coreComplete, sourceLost, breach));
+        var result = risks.evaluate(new AssetCardRiskService.Input(symbol, at, side, signal.direction(), signal.signalAsOf(), riskVersion(model), metrics,
+                modelMatches(current, model, at) ? model.riskDistributions(symbol, side.name()) : Map.of(), event, coreComplete, sourceLost, breach));
         if (result.invalidate() || !frameFresh && signal.direction() != null) {
             var state = signalStates.get(symbol);
             if (state != null) {
                 state = signals.invalidate(state, at); signalStates.put(symbol, state); signal = state.signal();
             } else signal = signal.invalidated();
         }
-        publishSignalAndRisk(current, signal, result.risk(), current.featureVersion(), current.modelVersion(), current.calibrationVersion(), at);
+        publishSignalAndRisk(current, signal, result.risk(), current.featureVersion(), current.modelVersion(), current.calibrationVersion(), current.thresholdVersion(), at, model);
         healthy(Field.RISK, symbol);
     }
 
@@ -522,19 +590,19 @@ public class AssetCardService {
     private static Instant later(Instant a, Instant b) { return a.isAfter(b) ? a : b; }
 
     private void publishSignalAndRisk(AssetCardSnapshot current, AssetCardSnapshot.Signal signal, AssetCardSnapshot.Risk risk,
-                                      String featureVersion, String modelVersion, String calibrationVersion, Instant at) {
-        if (risk == null || !risk.matchesBasis(signal) || !Objects.equals(risk.riskVersion(), riskVersion()))
-            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(), "方向或风险版本已变化，等待本方向证据重新评估");
+                                      String featureVersion, String modelVersion, String calibrationVersion, String thresholdVersion, Instant at, AssetCardModelBundle model) {
+        if (risk == null || !risk.matchesBasis(signal) || !Objects.equals(risk.riskVersion(), riskVersion(model)))
+            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), "方向或风险版本已变化，等待本方向证据重新评估");
         boolean signalChanged = !Objects.equals(signal,current.signal()) || !Objects.equals(featureVersion,current.featureVersion())
                 || !Objects.equals(modelVersion,current.modelVersion()) || !Objects.equals(calibrationVersion,current.calibrationVersion())
-                || !Objects.equals(model.thresholdVersion(), current.thresholdVersion());
+                || !Objects.equals(thresholdVersion, current.thresholdVersion());
         boolean riskChanged = !sameEffectiveRisk(risk,current.risk());
         if (!signalChanged && !riskChanged) return;
         if (!riskChanged) risk = current.risk();
         Instant clock = sameEffectiveSignal(signal,current.signal()) && sameEffectiveRisk(risk,current.risk()) ? current.cardAsOf() : at;
         long version = mapper.nextSnapshotVersion(current.symbol());
         var next = new AssetCardSnapshot(current.symbol(),current.assetName(),current.spotPrice(),current.latestPriceAt(),signal,risk,
-                current.health(),clock,version,featureVersion,modelVersion,calibrationVersion,model.thresholdVersion(),current.priceTradeId());
+                current.health(),clock,version,featureVersion,modelVersion,calibrationVersion,thresholdVersion,current.priceTradeId());
         persist(next, current.snapshotVersion());
         if (signalChanged) publish(next,"ASSET_CARD_SIGNAL",payload("signal",signal,"risk",risk,"cardAsOf",clock,
                 "featureVersion",featureVersion,"modelVersion",modelVersion,"calibrationVersion",calibrationVersion),at);
@@ -579,13 +647,15 @@ public class AssetCardService {
     }
 
     private void refreshPrice(String symbol, Instant at) {
-        synchronized (symbolLock(symbol)) { refreshPriceLocked(symbol, at); }
+        try (var lease = modelRegistry.acquire(symbol)) {
+            synchronized (symbolLock(symbol)) { refreshPriceLocked(symbol, at, lease.bundle()); }
+        }
     }
 
-    private void refreshPriceLocked(String symbol, Instant at) {
+    private void refreshPriceLocked(String symbol, Instant at, AssetCardModelBundle model) {
         AssetCardSnapshot current;
         try {
-            if (!started || writerReady) recoverRuntimeState(symbol, at);
+            if (!started || writerReady) recoverRuntimeState(symbol, at, model);
             current = loadSnapshot(symbol, symbol);
         } catch (RuntimeException unavailableStore) {
             failed(Field.RECOVERY, symbol, "卡片快照恢复暂不可用；现货成交仍独立更新");
@@ -603,7 +673,7 @@ public class AssetCardService {
             if (state != null) {
                 state = signals.invalidate(state, at); signalStates.put(symbol, state); signal = state.signal();
             } else signal = signal.invalidated();
-            risk = sourceLostRisk(signal, risk, at);
+            risk = sourceLostRisk(signal, risk, at, model);
         }
         boolean priceChanged = !Objects.equals(price, current.spotPrice()) || !Objects.equals(priceAt, current.latestPriceAt())
                 || quote != null && !Objects.equals(quote.tradeId(), current.priceTradeId());
@@ -648,16 +718,16 @@ public class AssetCardService {
         if (healthChanged) publish(next, "ASSET_CARD_HEALTH", payload("health", health, "signal", signal, "risk", risk), at);
     }
 
-    private AssetCardSnapshot.Risk sourceLostRisk(AssetCardSnapshot.Signal signal, AssetCardSnapshot.Risk previous, Instant at) {
+    private AssetCardSnapshot.Risk sourceLostRisk(AssetCardSnapshot.Signal signal, AssetCardSnapshot.Risk previous, Instant at, AssetCardModelBundle model) {
         List<AssetCardSnapshot.RiskItem> items = new ArrayList<>((previous != null && previous.matchesBasis(signal)
-                && Objects.equals(previous.riskVersion(), riskVersion()) ? previous
-                : AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(), "当前信号风险证据未就绪")).items());
+                && Objects.equals(previous.riskVersion(), riskVersion(model)) ? previous
+                : AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), "当前信号风险证据未就绪")).items());
         items.removeIf(item -> "DATA".equals(item.type()));
         items.add(new AssetCardSnapshot.RiskItem("DATA", "ASSESSED", "HIGH", "SPOT_SOURCE_UNAVAILABLE",
                 "BINANCE_SPOT_AGG_TRADE", at, "真实现货成交来源缺失或已过期", "SOURCE_STATE", true));
         return new AssetCardSnapshot.Risk("HIGH", items, at,
                 signal.direction() == null ? AssetCardSnapshot.SignalSide.NON_DIRECTIONAL : signal.direction().signalSide(),
-                signal.direction(), signal.signalAsOf(), previous == null ? null : previous.riskMarketAsOf(), riskVersion());
+                signal.direction(), signal.signalAsOf(), previous == null ? null : previous.riskMarketAsOf(), riskVersion(model));
     }
 
     private void persist(AssetCardSnapshot snapshot, long expectedSnapshotVersion) {
@@ -717,10 +787,14 @@ public class AssetCardService {
     public AssetCardSnapshot snapshot(String symbol, String name) {
         String normalized = normalize(symbol);
         Instant now = Instant.now();
+        try (var lease = modelRegistry.acquire(normalized)) { return snapshot(normalized, name, now, lease.bundle()); }
+    }
+
+    private AssetCardSnapshot snapshot(String normalized, String name, Instant now, AssetCardModelBundle model) {
         AssetCardSnapshot stored;
         try { stored = loadSnapshot(normalized, name); }
         catch (RuntimeException unavailableStore) { stored = AssetCardSnapshot.unavailable(normalized, name, "卡片快照存储暂不可用"); }
-        var value = publicModelProjection(stored, now);
+        var value = publicModelProjection(stored, now, model);
         var quote = market.quote(normalized, now).orElse(null);
         var currentPrice = quote == null ? value.spotPrice() : quote.price();
         var currentPriceAt = quote == null ? value.latestPriceAt() : quote.observedAt();
@@ -732,12 +806,12 @@ public class AssetCardService {
                 || Duration.between(currentPriceAt, now).compareTo(properties.getPriceTtl()) > 0;
         if (priceMissing) {
             signal = signal.direction() != null ? signal.invalidated() : signal;
-            risk = sourceLostRisk(signal, risk, now);
+            risk = sourceLostRisk(signal, risk, now, model);
             health = new AssetCardSnapshot.Health("SOURCE_UNAVAILABLE", "真实现货成交价格尚未就绪或已过期", now);
         } else {
             // Risk, model, storage and recovery faults never become a PRICE source failure.
             String riskFailure = failure(Field.RISK, normalized);
-            if (riskFailure != null) risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(), riskFailure);
+            if (riskFailure != null) risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), riskFailure);
             String signalFailure = failure(Field.SIGNAL, normalized);
             if (signalFailure != null) {
                 signal = new AssetCardSnapshot.Signal(signal.direction(), "FAILED", null, null, null,
@@ -754,33 +828,40 @@ public class AssetCardService {
 
     /** Current model identity is checked at every public read/event; stored private facts are never rewritten. */
     private AssetCardSnapshot publicModelProjection(AssetCardSnapshot snapshot, Instant checkedAt) {
+        try (var lease = modelRegistry.acquire(snapshot.symbol())) { return publicModelProjection(snapshot, checkedAt, lease.bundle()); }
+    }
+
+    private AssetCardSnapshot publicModelProjection(AssetCardSnapshot snapshot, Instant checkedAt, AssetCardModelBundle model) {
         var signal = snapshot.signal();
         var risk = snapshot.risk();
-        if (!risk.matchesBasis(signal) || !Objects.equals(risk.riskVersion(), riskVersion()))
-            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(), "风险身份或版本未匹配当前信号");
+        if (!risk.matchesBasis(signal) || !Objects.equals(risk.riskVersion(), riskVersion(model)))
+            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), "风险身份或版本未匹配当前信号");
         boolean hasModelResult = signal != null && (signal.direction() != null || signal.calibratedConfidence() != null
                 || signal.pLong() != null || signal.pShort() != null);
-        var current = model;
-        boolean trusted = !hasModelResult || current != null && current.validatedAt(checkedAt) && current.validatedAssets().contains(snapshot.symbol())
-                && AssetCardFeatureService.FEATURE_VERSION.equals(snapshot.featureVersion())
-                && current.modelVersion() != null && !current.modelVersion().isBlank()
-                && current.calibrationVersion() != null && !current.calibrationVersion().isBlank()
-                && Objects.equals(current.modelVersion(), snapshot.modelVersion())
-                && Objects.equals(current.calibrationVersion(), snapshot.calibrationVersion())
-                && Objects.equals(current.thresholdVersion(), snapshot.thresholdVersion());
+        boolean trusted = !hasModelResult || modelMatches(snapshot, model, checkedAt);
         boolean sourceLost = snapshot.health() != null && "SOURCE_UNAVAILABLE".equals(snapshot.health().status());
         if (trusted && risk == snapshot.risk() && !sourceLost) return snapshot;
         if (!trusted) {
             signal = AssetCardSnapshot.Signal.unavailable("UNVALIDATED", signal.signalAsOf());
-            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(), "模型身份失效，不能沿用此前方向风险");
+            risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), "模型身份失效，不能沿用此前方向风险");
         }
         if (sourceLost) {
             signal = signal.direction() == null ? signal : signal.invalidated();
-            risk = sourceLostRisk(signal, risk, checkedAt);
+            risk = sourceLostRisk(signal, risk, checkedAt, model);
         }
         return new AssetCardSnapshot(snapshot.symbol(), snapshot.assetName(), snapshot.spotPrice(), snapshot.latestPriceAt(),
                 signal, risk, trusted || sourceLost ? snapshot.health() : new AssetCardSnapshot.Health("MODEL_UNAVAILABLE", "卡片模型、校准或阈值版本不可用", checkedAt),
                 snapshot.cardAsOf(), snapshot.snapshotVersion(), snapshot.featureVersion(), snapshot.modelVersion(), snapshot.calibrationVersion(),snapshot.thresholdVersion(),snapshot.priceTradeId());
+    }
+
+    private static boolean modelMatches(AssetCardSnapshot snapshot, AssetCardModelBundle model, Instant at) {
+        return model.validatedAt(at) && model.validatedAssets().equals(Set.of(snapshot.symbol()))
+                && AssetCardFeatureService.FEATURE_VERSION.equals(snapshot.featureVersion())
+                && model.modelVersion() != null && !model.modelVersion().isBlank()
+                && model.calibrationVersion() != null && !model.calibrationVersion().isBlank()
+                && Objects.equals(model.modelVersion(), snapshot.modelVersion())
+                && Objects.equals(model.calibrationVersion(), snapshot.calibrationVersion())
+                && Objects.equals(model.thresholdVersion(), snapshot.thresholdVersion());
     }
 
     private AssetCardSnapshot loadSnapshot(String symbol, String name) {
@@ -824,11 +905,264 @@ public class AssetCardService {
                 && properties.getCanarySymbols().contains(canonical);
     }
 
+    /** Fixed-label pipeline. Original inference inputs are immutable; only outcome evidence is read after the horizon. */
+    static final class LabelPipeline {
+        static final String LABEL_DEFINITION = "ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED";
+        private final AssetCardMapper mapper;
+        private final ObjectMapper json;
+        LabelPipeline(AssetCardMapper mapper, ObjectMapper json) {
+            this.mapper = mapper;
+            this.json = json.copy().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                    .enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        }
+        record Outcome(Integer y, String outcome) {}
+        record Materialized(String status, Map<String,Object> record, Instant maturedAt, String evidenceSha256) {}
+        public record ExportReceipt(Path manifest, String manifestSha256, String recordsSha256, long recordCount,
+                                    Map<String,Long> exclusions, String modelMode, boolean productionModelReady) {}
+
+        static Outcome firstTouch(double entry, double atr, Instant start, List<AssetCardFeatureService.Bar> five,
+                                  List<AssetCardFeatureService.Bar> one, String side) {
+            if (!Set.of("LONG","SHORT").contains(side) || !Double.isFinite(entry) || !Double.isFinite(atr) || entry <= 0 || atr <= 0)
+                throw new IllegalArgumentException("Fixed-at-inference price, ATR and side required");
+            Instant end = start.plus(Duration.ofHours(4));
+            Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(),300)*300);
+            var bars = five.stream().filter(b -> !b.openTime().isBefore(first) && b.openTime().isBefore(end)).toList();
+            int count = (int) (Duration.between(first,end).toSeconds()/300) + (first.plusSeconds(Duration.between(first,end).toSeconds()/300*300).isBefore(end) ? 1 : 0);
+            if (!contiguous(bars,first,count,300)) return new Outcome(null,"INCOMPLETE_HORIZON");
+            double target = entry + (side.equals("LONG") ? atr : -atr);
+            double stop = entry + (side.equals("LONG") ? -.75*atr : .75*atr);
+            for (var bar : bars) {
+                boolean t = targetHit(bar,target,side), s = stopHit(bar,stop,side);
+                boolean partial = bar.openTime().isBefore(start) || bar.openTime().plusSeconds(300).isAfter(end);
+                if (t && s || partial && (t || s)) {
+                    var minutes = one.stream().filter(b -> !b.openTime().isBefore(bar.openTime()) && b.openTime().isBefore(bar.openTime().plusSeconds(300))).toList();
+                    if (!contiguous(minutes,bar.openTime(),5,60)
+                            || !near(minutes.stream().mapToDouble(AssetCardFeatureService.Bar::high).max().orElseThrow(),bar.high())
+                            || !near(minutes.stream().mapToDouble(AssetCardFeatureService.Bar::low).min().orElseThrow(),bar.low()))
+                        return new Outcome(null,"AMBIGUOUS");
+                    for (var minute : minutes) {
+                        if (!minute.openTime().plusSeconds(60).isAfter(start) || !minute.openTime().isBefore(end)) continue;
+                        boolean mt = targetHit(minute,target,side), ms = stopHit(minute,stop,side);
+                        if ((minute.openTime().isBefore(start) || minute.openTime().plusSeconds(60).isAfter(end)) && (mt || ms) || mt && ms)
+                            return new Outcome(null,"AMBIGUOUS");
+                        if (mt) return new Outcome(1,"TARGET");
+                        if (ms) return new Outcome(0,"STOP");
+                    }
+                    if (partial) continue;
+                    return new Outcome(null,"AMBIGUOUS");
+                }
+                if (t) return new Outcome(1,"TARGET");
+                if (s) return new Outcome(0,"STOP");
+            }
+            return new Outcome(0,"TIMEOUT");
+        }
+        private static boolean targetHit(AssetCardFeatureService.Bar b,double target,String side) { return side.equals("LONG") ? b.high()>=target : b.low()<=target; }
+        private static boolean stopHit(AssetCardFeatureService.Bar b,double stop,String side) { return side.equals("LONG") ? b.low()<=stop : b.high()>=stop; }
+        private static boolean near(double a,double b) { return Math.abs(a-b)<=Math.max(Math.abs(a),Math.abs(b))*1e-10; }
+        private static boolean contiguous(List<AssetCardFeatureService.Bar> bars,Instant first,int count,int seconds) {
+            if (bars.size()!=count) return false;
+            for (int i=0;i<count;i++) {
+                var b=bars.get(i); Instant next=b.openTime().plusSeconds(seconds);
+                if (!b.openTime().equals(first.plusSeconds((long)i*seconds)) || b.closeTime().isBefore(next.minusMillis(1))
+                        || b.closeTime().isAfter(next) || b.availableAt().isBefore(b.closeTime())
+                        || !Double.isFinite(b.high()) || !Double.isFinite(b.low()) || !Double.isFinite(b.open()) || !Double.isFinite(b.close()) || b.low()<=0
+                        || b.high()<Math.max(b.open(),b.close()) || b.low()>Math.min(b.open(),b.close())) return false;
+            }
+            return true;
+        }
+
+        Materialized materialize(AssetCardMapper.TypedHistory inference, Instant cutoff) {
+            try {
+                if (inference.recordKind()!=AssetCardMapper.HistoryKind.INFERENCE || inference.availableAt().isAfter(cutoff)) return pending("NOT_AVAILABLE_INFERENCE");
+                var audit=json.readTree(inference.payloadJson());
+                if (!audit.path("dataKind").asText().equals("LIVE_OBSERVED_CARD_INPUTS") || !audit.path("outcome").asText().equals("COMPLETED"))
+                    return pending("NO_SUCCESSFUL_REAL_INFERENCE");
+                var raw=json.treeToValue(audit.path("rawFrame"),AssetCardFeatureService.RawFrame.class);
+                var stored=json.treeToValue(audit.path("frame"),AssetCardFeatureService.Frame.class);
+                var frame=new AssetCardFeatureService().build(raw);
+                if (!frame.equals(stored) || !raw.symbol().equals(inference.symbol()) || !inference.recordKey().equals("5m:"+frame.closed5mAt())
+                        || !frame.ready() || !AssetCardFeatureService.FEATURE_VERSION.equals(frame.featureVersion())) return pending("INVALID_POINT_IN_TIME_INFERENCE");
+                var entry=frame.realInputs().get("spotPrice");
+                if (!AssetCardFeatureService.usableObservation(frame.symbol(),"spotPrice",entry,frame.signalAsOf())
+                        || entry.observationId()==null || !entry.observationId().matches("[0-9]+")) return pending("MISSING_REAL_SIGNAL_TRADE");
+                long tradeId=Long.parseLong(entry.observationId());
+                Instant start=frame.signalAsOf(), end=start.plus(Duration.ofHours(4));
+                if (cutoff.isBefore(end)) return pending("PENDING_FOUR_HOUR_HORIZON");
+                Instant first=Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(),300)*300);
+                Instant last=Instant.ofEpochSecond(Math.floorDiv(end.getEpochSecond(),300)*300);
+                if (last.isBefore(end)) last=last.plusSeconds(300);
+                var five=mapper.selectLabelBars(frame.symbol(),"5m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
+                var one=mapper.selectLabelBars(frame.symbol(),"1m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
+                int fiveCount=(int)Duration.between(first,last).toSeconds()/300;
+                if (!contiguous(five,first,fiveCount,300) || !contiguous(one,first,fiveCount*5,60)) return pending("PENDING_COMPLETE_1M_5M_HORIZON");
+                var horizonRow=mapper.selectHorizonTrade(frame.symbol(),start,end).orElse(null);
+                if (horizonRow==null) return pending("MISSING_POINT_IN_TIME_HORIZON_TRADE");
+                var horizon=json.treeToValue(json.readTree(horizonRow.payloadJson()).path("observation"),AssetCardFeatureService.Observation.class);
+                if (!AssetCardFeatureService.usableObservation(frame.symbol(),"spotPrice",horizon,end)
+                        || horizon.observationId()==null || !horizon.observationId().matches("[0-9]+")
+                        || !sameDatabaseInstant(horizon.observedAt(),horizonRow.signalAsOf()) || !sameDatabaseInstant(horizon.availableAt(),horizonRow.availableAt()))
+                    return pending("INVALID_POINT_IN_TIME_HORIZON_TRADE");
+                Instant maturedAt=later(end,later(inference.availableAt(),horizon.availableAt()));
+                for (var b:five) maturedAt=later(maturedAt,b.availableAt());
+                for (var b:one) maturedAt=later(maturedAt,b.availableAt());
+                Map<String,Object> labels=new TreeMap<>();
+                for (String side:List.of("LONG","SHORT")) {
+                    var outcome=firstTouch(entry.value(),frame.atr(),start,five,one,side);
+                    labels.put(side,payload("symbol",frame.symbol(),"side",side,"featureVersion",frame.featureVersion(),
+                            "labelDefinition",LABEL_DEFINITION,"signalTradeId",tradeId,"instrument",entry.instrument(),
+                            "sourceVersion",entry.sourceVersion(),"signalAsOf",start,"maturedAt",maturedAt,
+                            "outcome",outcome.outcome(),"y",outcome.y()));
+                }
+                var record=payload("rawFrame",raw,"future5m",exportBars(frame.symbol(),five,"5m"),
+                        "future1m",exportBars(frame.symbol(),one,"1m"),"horizonTrade",horizon,"labelResults",labels);
+                return new Materialized("MATURED",record,maturedAt,sha(json.writeValueAsBytes(record)));
+            } catch (JsonProcessingException | IllegalArgumentException invalid) { return pending("INVALID_IMMUTABLE_INFERENCE_OR_OBSERVATION"); }
+        }
+        private static Materialized pending(String status) { return new Materialized(status,null,null,null); }
+        /** PostgreSQL TIMESTAMPTZ is microsecond precision. Eligibility still uses the unrounded original JSON clock above. */
+        private static boolean sameDatabaseInstant(Instant original,Instant column) {
+            return original!=null && column!=null && Duration.between(original,column).abs().compareTo(Duration.ofNanos(1000))<0;
+        }
+        private List<Map<String,Object>> exportBars(String symbol,List<AssetCardFeatureService.Bar> bars,String interval) {
+            return bars.stream().map(b -> {
+                Map<String,Object> result=json.convertValue(b,new com.fasterxml.jackson.core.type.TypeReference<>(){});
+                result.put("instrument",AssetCardFeatureService.spotInstrument(symbol)); result.put("unit","OHLCV");
+                result.put("source","BINANCE_SPOT_CLOSED_"+interval.toUpperCase(Locale.ROOT));
+                result.put("sourceVersion",AssetCardFeatureService.SPOT_SOURCE_VERSION); return result;
+            }).toList();
+        }
+        @SuppressWarnings("unchecked")
+        void save(AssetCardMapper.TypedHistory inference,Materialized item) {
+            try {
+                var labels=(Map<String,Map<String,Object>>)item.record().get("labelResults");
+                for (var label:labels.values()) {
+                    String encoded=json.writeValueAsString(payload("label",label,"evidenceSha256",item.evidenceSha256(),
+                            "inferenceKey",inference.recordKey(),"dataKind","LIVE_OBSERVED_MATURE_CARD_LABEL"));
+                    mapper.saveLabel(inference.symbol(),(Instant)label.get("signalAsOf"),(String)label.get("instrument"),
+                            (String)label.get("sourceVersion"),(Long)label.get("signalTradeId"),(String)label.get("featureVersion"),
+                            LABEL_DEFINITION,(String)label.get("side"),item.maturedAt(),encoded);
+                }
+            } catch (JsonProcessingException failure) { throw new IllegalStateException("CARD_LABEL_ENCODING_FAILED",failure); }
+        }
+        private boolean persisted(AssetCardMapper.TypedHistory inference,Materialized item,Instant cutoff) {
+            var raw=(AssetCardFeatureService.RawFrame)item.record().get("rawFrame");
+            Set<String> sides=new HashSet<>();
+            for (var row:mapper.selectHistory(inference.symbol(),AssetCardMapper.HistoryKind.LABEL,raw.signalAsOf(),raw.signalAsOf(),cutoff,100)) {
+                try {
+                    var saved=json.readTree(row.payloadJson());
+                    String side=saved.path("label").path("side").asText();
+                    if (saved.path("dataKind").asText().equals("LIVE_OBSERVED_MATURE_CARD_LABEL")
+                            && saved.path("inferenceKey").asText().equals(inference.recordKey())
+                            && saved.path("evidenceSha256").asText().equals(item.evidenceSha256())
+                            && saved.path("label").toString().equals(json.valueToTree(((Map<?,?>)item.record().get("labelResults")).get(side)).toString())) sides.add(side);
+                } catch (JsonProcessingException invalid) { return false; }
+            }
+            return sides.containsAll(Set.of("LONG","SHORT"));
+        }
+
+        ExportReceipt export(String symbol,Instant from,Instant to,Instant cutoff,Path parent) {
+            if (from==null || to==null || cutoff==null || !from.isBefore(to) || to.isAfter(cutoff) || cutoff.isAfter(Instant.now()))
+                throw new IllegalArgumentException("Explicit historical export range and fixed cutoff required");
+            Path directory=null;
+            try {
+                Path root=parent.toAbsolutePath().normalize();
+                if (!java.nio.file.Files.isDirectory(root) || java.nio.file.Files.isSymbolicLink(root))
+                    throw new IllegalArgumentException("Existing non-symlink export directory required");
+                root=root.toRealPath(); // Canonicalize platform /var aliases before creating our unique child; never follow a supplied final symlink.
+                String version=sha(json.writeValueAsBytes(payload("symbol",symbol,"from",from,"to",to,"cutoff",cutoff,
+                        "featureVersion",AssetCardFeatureService.FEATURE_VERSION,"labelDefinition",LABEL_DEFINITION)));
+                directory=java.nio.file.Files.createTempDirectory(root,"card-export-");
+                Path spool=directory.resolve("records.partial");
+                Path recordsFile=directory.resolve("records.jsonl");
+                var digest=java.security.MessageDigest.getInstance("SHA-256");
+                long count=0; Map<String,Long> excluded=new TreeMap<>();
+                var sources=new TreeMap<String,Map<String,String>>();
+                AssetCardMapper.TypedHistory cursor=null;
+                try (var out=new java.security.DigestOutputStream(java.nio.file.Files.newOutputStream(spool,
+                        java.nio.file.StandardOpenOption.CREATE_NEW),digest)) {
+                    while (true) {
+                        // Inference identity uses the preceding closed bar; raw signal time is checked separately below.
+                        var rows=mapper.selectHistoryPage(symbol,AssetCardMapper.HistoryKind.INFERENCE,from.minusSeconds(300),to,cutoff,
+                                cursor==null?null:cursor.signalAsOf(),cursor==null?null:cursor.recordKey(),128);
+                        if (rows.isEmpty()) break;
+                        for (var row:rows) {
+                            cursor=row;
+                            var item=materialize(row,cutoff);
+                            if (item.record()==null) { excluded.merge(item.status(),1L,Long::sum); continue; }
+                            var raw=(AssetCardFeatureService.RawFrame)item.record().get("rawFrame");
+                            if (raw.signalAsOf().isBefore(from) || !raw.signalAsOf().isBefore(to)) continue;
+                            if (!persisted(row,item,cutoff)) { excluded.merge("MATURE_LABEL_NOT_PERSISTED_OR_IDENTITY_MISMATCH",1L,Long::sum); continue; }
+                            var recordSources=sourceIdentities(item.record());
+                            if (!recordSources.values().stream().anyMatch(s -> s.get("provider").equals("COINGLASS"))) {
+                                excluded.merge("MISSING_SEPARATE_COINGLASS_PROVENANCE",1L,Long::sum); continue;
+                            }
+                            sources.putAll(recordSources);
+                            item.record().put("provenance",provenance(version,cutoff,new ArrayList<>(recordSources.values())));
+                            out.write(json.writeValueAsBytes(item.record())); out.write('\n'); count++;
+                        }
+                    }
+                }
+                // Bind version to the actual immutable population as well as the scope. No circular hash of its own final version.
+                version=sha((version+":"+HexFormat.of().formatHex(digest.digest())).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                digest=java.security.MessageDigest.getInstance("SHA-256");
+                try (var input=java.nio.file.Files.newBufferedReader(spool);
+                     var out=new java.security.DigestOutputStream(java.nio.file.Files.newOutputStream(recordsFile,
+                             java.nio.file.StandardOpenOption.CREATE_NEW),digest)) {
+                    String line;
+                    while ((line=input.readLine())!=null) {
+                        var record=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(line);
+                        ((com.fasterxml.jackson.databind.node.ObjectNode)record.path("provenance")).put("datasetVersion",version);
+                        out.write(json.writeValueAsBytes(record)); out.write('\n');
+                    }
+                }
+                java.nio.file.Files.delete(spool); // Only our unique, unpublished card-only spool; never an input or existing file.
+                String recordsSha=HexFormat.of().formatHex(digest.digest());
+                var manifest=payload("schemaVersion",1,"exportKind","ASSET_CARD_DB_EXPORT_V1","symbol",symbol,
+                        "featureVersion",AssetCardFeatureService.FEATURE_VERSION,"labelDefinition",LABEL_DEFINITION,
+                        "range",payload("fromInclusive",from,"toExclusive",to,"availableAtCutoff",cutoff),"recordCount",count,
+                        "sourceVersions",new ArrayList<>(sources.values()),"provenance",provenance(version,cutoff,new ArrayList<>(sources.values())),
+                        "files",List.of(payload("path","records.jsonl","kind","RAW_FRAMES","count",count,"sha256",recordsSha)),
+                        "exclusions",excluded,"modelMode","SHADOW","productionModelReady",false);
+                byte[] bytes=json.writeValueAsBytes(manifest); Path manifestFile=directory.resolve("manifest.json");
+                java.nio.file.Files.write(manifestFile,bytes,java.nio.file.StandardOpenOption.CREATE_NEW);
+                return new ExportReceipt(manifestFile,sha(bytes),recordsSha,count,Map.copyOf(excluded),"SHADOW",false);
+            } catch (java.io.IOException | java.security.NoSuchAlgorithmException failure) {
+                // No committed manifest is written until the complete stream/checksum succeeds. Failed partial data is never trainable.
+                throw new IllegalStateException("CARD_OFFLINE_EXPORT_FAILED_WITHOUT_PUBLISHED_MANIFEST",failure);
+            }
+        }
+        private Map<String,Object> provenance(String version,Instant cutoff,List<Map<String,String>> sources) {
+            return payload("kind","REAL_HISTORICAL","datasetVersion",version,"source","BINANCE_SPOT",
+                    "availabilityBasis","RECORDED_AT_INGESTION","capturedAt",cutoff,"sources",sources);
+        }
+        private TreeMap<String,Map<String,String>> sourceIdentities(Map<String,Object> record) {
+            var result=new TreeMap<String,Map<String,String>>();
+            collectSources(json.valueToTree(record),result); return result;
+        }
+        private void collectSources(com.fasterxml.jackson.databind.JsonNode node,Map<String,Map<String,String>> result) {
+            if (node.isObject() && node.has("source") && node.has("instrument") && node.has("unit") && node.has("sourceVersion")) {
+                String source=node.path("source").asText(), version=node.path("sourceVersion").asText();
+                if (!source.isBlank() && !version.isBlank() && !Set.of("UNKNOWN","UNVERIFIED").contains(version)) {
+                    String provider=source.startsWith("BINANCE_SPOT") ? "BINANCE_SPOT" : source.startsWith("COINGLASS") ? "COINGLASS" : null;
+                    if (provider!=null) {
+                        var identity=Map.of("provider",provider,"source",source,"sourceVersion",version,"instrument",node.path("instrument").asText(),"unit",node.path("unit").asText());
+                        result.put(provider+"|"+source+"|"+version+"|"+identity.get("instrument")+"|"+identity.get("unit"),identity);
+                    }
+                }
+            }
+            if (node.isContainerNode()) node.forEach(child -> collectSources(child,result));
+        }
+        private static String sha(byte[] bytes) {
+            try { return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)); }
+            catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+        }
+    }
+
     private static String normalize(String symbol) {
         if (symbol == null) throw new IllegalArgumentException("Card symbol required");
         String value = symbol.trim().toUpperCase(Locale.ROOT);
         if (!value.matches("[A-Z0-9]{2,32}")) throw new IllegalArgumentException("Invalid card symbol");
         return value;
     }
-    @PreDestroy public void close() { started = false; background.shutdownNow(); inference.shutdownNow(); riskWorkers.shutdownNow(); model.close(); }
+    @PreDestroy public void close() { started = false; background.shutdownNow(); inference.shutdownNow(); riskWorkers.shutdownNow(); labelWorker.shutdownNow(); modelRegistry.close(); }
 }

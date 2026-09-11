@@ -96,6 +96,29 @@ class V24AssetCardLiveSignalMigrationContractTest {
                 assertThat(mapper.saveInference(symbol, asOf.minusMillis(1), asOf.plusSeconds(1), "{\"status\":\"LATER\"}")).isZero();
                 assertThat(mapper.selectInference(symbol, asOf, asOf).orElseThrow().payloadJson())
                         .isEqualTo("{\"status\":\"TIMEOUT\"}");
+
+                // PostgreSQL columns round to microseconds; original JSON clocks must still gate label eligibility.
+                var horizon = asOf.plusSeconds(14400);
+                var originalAvailableAt = horizon.plusNanos(1);
+                var observation = new org.example.trademodel.assetcard.AssetCardFeatureService.Observation(
+                        10.0, "BINANCE_SPOT_AGG_TRADE", horizon.minusSeconds(1), originalAvailableAt,
+                        "BINANCE:SPOT:NONE:BTC/USDT", "BINANCE_SPOT_PUBLIC_V1", "QUOTE_CURRENCY", horizon.plusSeconds(10), "42");
+                var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                        .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                String payload = json.writeValueAsString(java.util.Map.of("observation", observation));
+                var trade = new org.example.trademodel.assetcard.AssetCardMarketDataService.SpotQuote("BTCUSDT",
+                        java.math.BigDecimal.TEN, java.math.BigDecimal.ONE, 42, observation.observedAt(), originalAvailableAt);
+                assertThat(mapper.saveTradeObservation(trade, observation.instrument(), observation.sourceVersion(), payload)).isEqualTo(1);
+                var candidate = mapper.selectHorizonTrade("BTCUSDT", horizon.minusSeconds(2), horizon).orElseThrow();
+                assertThat(candidate.availableAt()).isEqualTo(horizon);
+                assertThat(candidate.payloadJson()).isEqualTo(payload);
+                var restored = json.treeToValue(json.readTree(candidate.payloadJson()).path("observation"),
+                        org.example.trademodel.assetcard.AssetCardFeatureService.Observation.class);
+                assertThat(restored.availableAt()).isEqualTo(originalAvailableAt).isAfter(horizon);
+                assertThat(org.example.trademodel.assetcard.AssetCardFeatureService.usableObservation(
+                        "BTCUSDT", "spotPrice", restored, horizon)).isFalse();
+                assertThat(org.example.trademodel.assetcard.AssetCardFeatureService.usableObservation(
+                        "BTCUSDT", "spotPrice", restored, originalAvailableAt)).isTrue();
             }
         }
     }

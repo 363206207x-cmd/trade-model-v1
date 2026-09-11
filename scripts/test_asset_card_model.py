@@ -6,6 +6,9 @@ import unittest
 from unittest.mock import patch
 import copy
 import json
+import tempfile
+import io
+import contextlib
 
 SPEC = importlib.util.spec_from_file_location("asset_card_model", pathlib.Path(__file__).with_name("asset_card_model.py"))
 model = importlib.util.module_from_spec(SPEC)
@@ -145,7 +148,7 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(sum(x["count"] for x in report["bins"]),4)
 
     def test_purge_and_embargo_separate_all_label_intervals(self):
-        rows=[{"signalAsOf":i*3600,"labelEnd":i*3600+14400} for i in range(120)]
+        rows=[{"signalAsOf":i*3600,"labelEnd":i*3600+14400,"labelAvailableAt":i*3600+14400} for i in range(120)]
         parts=model.temporal_split(rows,{"trainEnd":30*3600,"calibrationEnd":60*3600,"validationEnd":90*3600,"testEnd":120*3600})
         for left,right in zip(parts,parts[1:]):
             self.assertTrue(max(x["labelEnd"] for x in left)+14400 <= min(x["signalAsOf"] for x in right))
@@ -373,6 +376,220 @@ class ModelTests(unittest.TestCase):
         if importlib.util.find_spec("scipy") is None: self.skipTest("Fixed offline SciPy test dependency required")
         with self.assertRaisesRegex(ValueError,"Invalid probability/independent monotone beta calibrator"):
             model.fit_beta([.1,.2,.8,.9],[1,1,0,0])
+
+
+class CardExportTests(unittest.TestCase):
+    """Synthetic files isolate export validation; real provenance rejection is never bypassed outside these tests."""
+    @staticmethod
+    def fixture():
+        at=1767268800; end=at+model.HORIZON
+        raw=ModelTests.feature_fixture(at)
+        raw["evidence"]["fundingRate"]={**ModelTests.observation("fundingRate",.001,at),
+            "source":"COINGLASS:COINGLASS_FUNDING:TEST_FIXTURE","instrument":model.instrument("BTCUSDT",True)}
+        raw["evidence"]["spotPrice"]["observationId"]="41"
+        future=ModelTests.path_bars(at)
+        for bar in future:
+            bar.update(availableAt=bar["closeTime"],instrument=model.instrument("BTCUSDT"),
+                source="BINANCE_SPOT_CLOSED_5M",sourceVersion="TEST_FIXTURE_V2",unit="OHLCV")
+        horizon={**ModelTests.observation("spotPrice",100.2,end-.5),"availableAt":end,"observationId":"83"}
+        sources=[]
+        for observation in list(raw["evidence"].values())+[future[0],horizon]:
+            source={key:observation[key] for key in ("source","sourceVersion","instrument","unit")}
+            source["provider"]="COINGLASS" if source["source"].startswith("COINGLASS:") else "BINANCE_SPOT"
+            if source not in sources: sources.append(source)
+        provenance={"kind":"SYNTHETIC_FIXTURE","datasetVersion":"TEST_EXPORT_ONLY","source":"BINANCE_SPOT",
+            "availabilityBasis":"RECORDED_AT_INGESTION","capturedAt":model.instant(end+300),"sources":sources}
+        labels={side:{"symbol":"BTCUSDT","side":side,"featureVersion":model.FEATURE_VERSION,
+            "labelDefinition":"ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED",
+            "signalTradeId":41,"instrument":model.instrument("BTCUSDT"),"sourceVersion":"TEST_FIXTURE_V2",
+            "signalAsOf":model.instant(at),"maturedAt":model.instant(end+1),"outcome":"TIMEOUT","y":0}
+            for side in ("LONG","SHORT")}
+        record={"rawFrame":raw,"future5m":future,"future1m":[],"horizonTrade":horizon,
+            "labelResults":labels,"provenance":copy.deepcopy(provenance)}
+        manifest={"schemaVersion":1,"exportKind":"ASSET_CARD_DB_EXPORT_V1","symbol":"BTCUSDT",
+            "featureVersion":model.FEATURE_VERSION,"labelDefinition":labels["LONG"]["labelDefinition"],
+            "range":{"fromInclusive":model.instant(at),"toExclusive":model.instant(at+300),"availableAtCutoff":model.instant(end+300)},
+            "recordCount":1,"sourceVersions":copy.deepcopy(sources),"provenance":provenance}
+        return manifest,record
+
+    @staticmethod
+    def write_fixture(directory,manifest,records):
+        folder=pathlib.Path(directory); data=folder/"records.jsonl"
+        data.write_text("".join(json.dumps(row,sort_keys=True,allow_nan=False)+"\n" for row in records))
+        manifest=copy.deepcopy(manifest)
+        manifest["files"]=[{"path":"records.jsonl","kind":"RAW_FRAMES","count":len(records),"sha256":model.sha256(data)}]
+        path=folder/"manifest.json"; path.write_text(json.dumps(manifest,sort_keys=True,allow_nan=False))
+        return path
+
+    def test_export_verification_is_repeatable_read_only_and_never_production_ready(self):
+        manifest,record=self.fixture()
+        with tempfile.TemporaryDirectory(prefix="asset-card-export-test-") as folder:
+            path=self.write_fixture(folder,manifest,[record]); before={p.name:p.read_bytes() for p in pathlib.Path(folder).iterdir()}
+            with patch.object(model,"validate_provenance",return_value=None):
+                first=model.verify_export(path); second=model.verify_export(path)
+            self.assertEqual(first,second); self.assertEqual(first["recordCount"],1)
+            self.assertEqual(first["labelOutcomes"],{"LONG":{"TIMEOUT":1},"SHORT":{"TIMEOUT":1}})
+            self.assertEqual(first["mode"],"SHADOW"); self.assertFalse(first["productionModelReady"])
+            self.assertEqual(first["manifestSha256"],model.sha256(path))
+            self.assertEqual(before,{p.name:p.read_bytes() for p in pathlib.Path(folder).iterdir()})
+            with self.assertRaises(ValueError): model.verify_export(path)
+
+    def test_export_statistics_are_shadow_only_and_cannot_claim_model_readiness(self):
+        manifest,record=self.fixture()
+        manifest.update(exclusions={"PENDING_HORIZON":2},modelMode="SHADOW",productionModelReady=False)
+        with patch.object(model,"validate_provenance",return_value=None):
+            model.validate_card_export(manifest,[record])
+            for key,value in (("modelMode","ACTIVE"),("modelMode","CANARY"),("productionModelReady",True),
+                    ("productionModelReady",0),("exclusions",{"PENDING":-1}),("exclusions",{"PENDING":True}),
+                    ("exclusions",{"":1}),("exclusions",[])):
+                with self.subTest(key=key,value=value),self.assertRaises(ValueError):
+                    model.validate_card_export({**manifest,key:value},[record])
+
+    def test_export_identity_label_claims_and_private_payloads_fail_closed(self):
+        manifest,record=self.fixture()
+        mutations=[("symbol","ETHUSDT"),("side","SHORT"),("featureVersion","OTHER"),("labelDefinition","OTHER"),
+            ("signalTradeId",42),("instrument",model.instrument("ETHUSDT")),("sourceVersion","OTHER"),
+            ("signalAsOf","2026-01-01T12:00:00.000000001Z"),("outcome","TARGET"),("y",1),("y",True)]
+        with patch.object(model,"validate_provenance",return_value=None):
+            for key,value in mutations:
+                invalid=copy.deepcopy(record); invalid["labelResults"]["LONG"][key]=value
+                with self.subTest(key=key,value=value),self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+            for location,key in (("record","_runtime"),("rawFrame","userId"),("spotPrice","ownerId")):
+                invalid=copy.deepcopy(record)
+                target=invalid if location=="record" else invalid["rawFrame"] if location=="rawFrame" else invalid["rawFrame"]["evidence"]["spotPrice"]
+                target[key]="PRIVATE_FIXTURE_MUST_REJECT"
+                with self.subTest(location=location),self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+
+    def test_export_range_counts_source_versions_and_duplicate_signals_are_bound(self):
+        manifest,record=self.fixture()
+        with patch.object(model,"validate_provenance",return_value=None):
+            for key,value in (("symbol","ETHUSDT"),("featureVersion","OTHER"),("labelDefinition","OTHER"),("recordCount",2),("sourceVersions",[])):
+                invalid={**manifest,key:value}
+                with self.subTest(key=key),self.assertRaises(ValueError): model.validate_card_export(invalid,[record])
+            invalid=copy.deepcopy(manifest); invalid["range"]["toExclusive"]=invalid["range"]["fromInclusive"]
+            with self.assertRaises(ValueError): model.validate_card_export(invalid,[record])
+            with self.assertRaises(ValueError): model.validate_card_export({**manifest,"recordCount":2},[record,copy.deepcopy(record)])
+            invalid=copy.deepcopy(record); invalid["provenance"]["datasetVersion"]="OTHER"
+            with self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+
+    def test_export_never_backfills_availability_or_invents_horizon_trade(self):
+        manifest,record=self.fixture(); at=record["rawFrame"]["signalAsOf"]
+        with patch.object(model,"validate_provenance",return_value=None):
+            invalid=copy.deepcopy(record); invalid["rawFrame"]["evidence"]["fundingRate"]["availableAt"]=at+1
+            with self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+            invalid=copy.deepcopy(record); invalid["rawFrame"]["bars"]["5m"][-1]["availableAt"]=at+1
+            with self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+            invalid=copy.deepcopy(record); invalid["labelResults"]["LONG"]["maturedAt"]=model.instant(at+model.HORIZON-1)
+            with self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+            for key,value in (("availableAt",at+model.HORIZON+.000000001),("observationId",None),("instrument",model.instrument("ETHUSDT"))):
+                invalid=copy.deepcopy(record); invalid["horizonTrade"][key]=value
+                if key=="availableAt": invalid["horizonTrade"][key]=model.timestamp(model.instant(at+model.HORIZON))+model.Decimal(".000000001")
+                with self.subTest(key=key),self.assertRaises(ValueError): model.validate_card_export(manifest,[invalid])
+
+    def test_export_recomputes_ambiguous_labels_instead_of_accepting_java_success(self):
+        manifest,record=self.fixture(); at=record["rawFrame"]["signalAsOf"]
+        record["future5m"][0].update(high=104,low=97)
+        with patch.object(model,"validate_provenance",return_value=None):
+            with self.assertRaises(ValueError): model.validate_card_export(manifest,[record])
+            for side in ("LONG","SHORT"): record["labelResults"][side].update(y=None,outcome="AMBIGUOUS")
+            model.validate_card_export(manifest,[record])
+            minutes=ModelTests.path_bars(at,count=5,step=60)
+            for minute in minutes:
+                minute.update(availableAt=minute["closeTime"],instrument=model.instrument("BTCUSDT"),
+                    source="BINANCE_SPOT_CLOSED_1M",sourceVersion="TEST_FIXTURE_V2",unit="OHLCV")
+            minutes[0].update(high=104,low=97); record["future1m"]=minutes
+            source={key:minutes[0][key] for key in ("source","sourceVersion","instrument","unit")}
+            source["provider"]="BINANCE_SPOT"
+            for sources in (record["provenance"]["sources"],manifest["provenance"]["sources"],manifest["sourceVersions"]):
+                sources.append(copy.deepcopy(source))
+            model.validate_card_export(manifest,[record])
+
+    def test_export_future_bars_cannot_disguise_timeframe_or_malformed_closed_boundaries(self):
+        manifest,record=self.fixture()
+        with patch.object(model,"validate_provenance",return_value=None):
+            for key,value in (("source","BINANCE_SPOT_CLOSED_1M"),("closeTime",record["future5m"][0]["openTime"]+60),
+                    ("open",float("nan"))):
+                invalid=copy.deepcopy(record); invalid["future5m"][0][key]=value
+                # Register the claimed provider, so this tests timeframe consistency rather than only source membership.
+                altered=copy.deepcopy(manifest)
+                if key=="source":
+                    source={name:invalid["future5m"][0][name] for name in ("source","sourceVersion","instrument","unit")}
+                    source["provider"]="BINANCE_SPOT"
+                    for sources in (invalid["provenance"]["sources"],altered["provenance"]["sources"],altered["sourceVersions"]):
+                        sources.append(copy.deepcopy(source))
+                if key!="source":
+                    for side in ("LONG","SHORT"): invalid["labelResults"][side].update(y=None,outcome="INCOMPLETE_HORIZON")
+                with self.subTest(key=key),self.assertRaises(ValueError): model.validate_card_export(altered,[invalid])
+
+    def test_export_labels_cannot_bypass_binding_by_removing_the_export_marker(self):
+        manifest,record=self.fixture(); manifest.pop("exportKind")
+        with tempfile.TemporaryDirectory(prefix="asset-card-export-test-") as folder,patch.object(model,"validate_provenance",return_value=None):
+            path=self.write_fixture(folder,manifest,[record])
+            with self.assertRaises(ValueError): model.read_dataset(path)
+
+    def test_prepared_label_availability_keeps_the_fixed_horizon_but_waits_for_partial_bar_maturity(self):
+        manifest,record=self.fixture(); at=record["rawFrame"]["signalAsOf"]; signal=model.timestamp(at)+model.Decimal("5.123")
+        record["rawFrame"]["signalAsOf"]=model.instant(signal)
+        record["rawFrame"]["evidence"]["spotPrice"].update(observedAt=model.instant(signal),availableAt=model.instant(signal))
+        record["future5m"].append({**record["future5m"][-1],"openTime":at+model.HORIZON,
+            "closeTime":at+model.HORIZON+300,"availableAt":at+model.HORIZON+300})
+        record["horizonTrade"].update(observedAt=model.instant(signal+model.HORIZON-model.Decimal(".5")),
+            availableAt=model.instant(signal+model.HORIZON),expiresAt=model.instant(signal+model.HORIZON+10))
+        for label in record["labelResults"].values():
+            label.update(signalAsOf=model.instant(signal),maturedAt=model.instant(at+model.HORIZON+300))
+        policy={"maxSignalTradeAgeSeconds":2,"roundTripFeeRate":.001,"roundTripSlippageRate":.001,"volatilityStrata":[.01,.02]}
+        with patch.object(model,"validate_provenance",return_value=None):
+            model.validate_card_export(manifest,[record])
+            rows,excluded=model.prepare_records([record],policy)
+        self.assertEqual(excluded,{})
+        self.assertEqual(rows[0]["labelEnd"],signal+model.HORIZON)
+        self.assertEqual(rows[0]["labelAvailableAt"],model.timestamp(at+model.HORIZON+300))
+        self.assertGreater(rows[0]["labelAvailableAt"],rows[0]["labelEnd"])
+
+    def test_every_temporal_fold_excludes_labels_not_yet_available_at_its_boundary(self):
+        boundaries={"trainEnd":30*3600,"calibrationEnd":60*3600,"validationEnd":90*3600,"testEnd":120*3600}
+        rows=[{"signalAsOf":i*3600,"labelEnd":i*3600+model.HORIZON,"labelAvailableAt":i*3600+model.HORIZON} for i in range(120)]
+        delayed=[]
+        for end in boundaries.values():
+            row=next(row for row in rows if row["labelEnd"]==end)
+            row["labelAvailableAt"]=model.timestamp(end)+model.Decimal(".000000001"); delayed.append(row)
+        parts=model.temporal_split(rows,boundaries)
+        for part,end in zip(parts,boundaries.values()):
+            self.assertTrue(all(row["labelAvailableAt"]<=end for row in part))
+            self.assertFalse(any(row in part for row in delayed))
+        for left,right in zip(parts,parts[1:]):
+            self.assertLessEqual(max(row["labelEnd"] for row in left)+model.HORIZON,min(row["signalAsOf"] for row in right))
+        for value in (None,0):
+            invalid=copy.deepcopy(rows)
+            if value is None: invalid[0].pop("labelAvailableAt")
+            else: invalid[0]["labelAvailableAt"]=value
+            with self.subTest(availability=value),self.assertRaises(ValueError): model.temporal_split(invalid,boundaries)
+
+    def test_export_file_checksums_counts_paths_and_symlinks_are_not_trusted(self):
+        manifest,record=self.fixture()
+        with tempfile.TemporaryDirectory(prefix="asset-card-export-test-") as folder,patch.object(model,"validate_provenance",return_value=None):
+            path=self.write_fixture(folder,manifest,[record]); original=json.loads(path.read_text())
+            for key,value in (("sha256","0"*64),("count",2),("path","../records.jsonl")):
+                invalid=copy.deepcopy(original); invalid["files"][0][key]=value; path.write_text(json.dumps(invalid))
+                with self.subTest(key=key),self.assertRaises(ValueError): model.verify_export(path)
+            link=pathlib.Path(folder)/"linked.jsonl"; link.symlink_to(pathlib.Path(folder)/"records.jsonl")
+            invalid=copy.deepcopy(original); invalid["files"][0]["path"]="linked.jsonl"; path.write_text(json.dumps(invalid))
+            with self.assertRaises(ValueError): model.verify_export(path)
+
+    def test_export_json_rejects_duplicate_identity_keys_and_nonfinite_values(self):
+        for value in ('{"symbol":"BTCUSDT","symbol":"ETHUSDT"}', '{"value":NaN}', '{"value":Infinity}'):
+            with self.assertRaises(ValueError): model.decode_json(value)
+
+    def test_verify_export_cli_does_not_need_or_invent_training_costs(self):
+        manifest,record=self.fixture()
+        with tempfile.TemporaryDirectory(prefix="asset-card-export-test-") as folder:
+            path=self.write_fixture(folder,manifest,[record]); output=io.StringIO()
+            with patch.object(model,"validate_provenance",return_value=None),patch.object(model,"train_bundle") as train,\
+                    patch("sys.argv",["asset_card_model.py","verify-export",str(path)]),contextlib.redirect_stdout(output):
+                model.main()
+            result=json.loads(output.getvalue()); self.assertFalse(result["productionModelReady"]); train.assert_not_called()
+            with patch.object(model,"validate_provenance",return_value=None),self.assertRaises((ValueError,KeyError)):
+                model.validate_training_manifest(manifest)
 
 
 if __name__ == "__main__": unittest.main()

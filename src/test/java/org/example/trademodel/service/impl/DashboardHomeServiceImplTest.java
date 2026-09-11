@@ -408,13 +408,11 @@ class DashboardHomeServiceImplTest {
         try {
             installCardMetadataOnlyFixture(cards);
             // This isolated projection fixture has explicit lifecycle metadata, never real training or native inference.
-            var bundle = (AssetCardModelBundle) ReflectionTestUtils.getField(cards, "model");
-            int featureCount = AssetCardFeatureService.FEATURE_NAMES.size();
-            ReflectionTestUtils.setField(bundle, "lifecycle", new AssetCardModelBundle.Lifecycle(
-                    "TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK", Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"),
-                    java.util.Set.of("0".repeat(featureCount)), java.util.Collections.nCopies(featureCount, 0.0),
-                    java.util.Collections.nCopies(featureCount, 2.0), .5));
-            assertThat(bundle.validated()).isTrue();
+            var registry = (AssetCardModelBundle.Registry) ReflectionTestUtils.getField(cards, "modelRegistry");
+            for (String symbol : List.of("BTCUSDT", "LINKUSDT")) try (var lease = registry.acquire(symbol)) {
+                assertThat(lease.bundle().validated()).isTrue();
+                assertThat(lease.bundle().validatedAssets()).containsExactly(symbol);
+            }
             service.setAssetPoolService(pool);
             service.setAssetCardService(cards);
             List<AssetPoolAssetDTO> members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
@@ -619,10 +617,26 @@ class DashboardHomeServiceImplTest {
                     AssetCardModelBundle.Thresholds.class, Map.class, java.util.Set.class, String.class);
             constructor.setAccessible(true);
             var calibration = new AssetCardBetaCalibration.Parameters(1, 1, 0, 1e-12);
-            var bundle = constructor.newInstance(mock(ml.dmlc.xgboost4j.java.Booster.class), mock(ml.dmlc.xgboost4j.java.Booster.class),
-                    calibration, calibration, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", "TEST_FIXTURE_THRESHOLDS",
-                    null, Map.of(), java.util.Set.of("BTCUSDT", "LINKUSDT"), null);
-            ReflectionTestUtils.setField(cards, "model", bundle);
+            Map<String, AssetCardModelBundle.Source> sources = new java.util.HashMap<>();
+            Map<AssetCardModelBundle.Source, AssetCardModelBundle> bundles = new java.util.HashMap<>();
+            for (String symbol : List.of("BTCUSDT", "LINKUSDT")) {
+                var bundle = constructor.newInstance(mock(ml.dmlc.xgboost4j.java.Booster.class), mock(ml.dmlc.xgboost4j.java.Booster.class),
+                        calibration, calibration, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", "TEST_FIXTURE_THRESHOLDS",
+                        null, Map.of(), java.util.Set.of(symbol), null);
+                int count = AssetCardFeatureService.FEATURE_NAMES.size();
+                ReflectionTestUtils.setField(bundle, "lifecycle", new AssetCardModelBundle.Lifecycle(
+                        "TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK", Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"),
+                        java.util.Set.of("0".repeat(count)), java.util.Collections.nCopies(count, 0.0),
+                        java.util.Collections.nCopies(count, 2.0), .5));
+                var source = new AssetCardModelBundle.Source(java.nio.file.Path.of("TEST_ONLY_" + symbol), "0".repeat(64));
+                sources.put(symbol, source); bundles.put(source, bundle);
+            }
+            var registryConstructor = AssetCardModelBundle.Registry.class.getDeclaredConstructor(java.util.function.Function.class);
+            registryConstructor.setAccessible(true);
+            var registry = registryConstructor.newInstance((java.util.function.Function<AssetCardModelBundle.Source, AssetCardModelBundle>) bundles::get);
+            registry.reconcile(sources);
+            ((AssetCardModelBundle.Registry) ReflectionTestUtils.getField(cards, "modelRegistry")).close();
+            ReflectionTestUtils.setField(cards, "modelRegistry", registry);
         } catch (ReflectiveOperationException failure) { throw new AssertionError("Test-only immutable bundle signature changed", failure); }
     }
 

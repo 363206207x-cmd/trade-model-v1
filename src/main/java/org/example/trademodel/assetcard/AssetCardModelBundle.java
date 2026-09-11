@@ -11,7 +11,10 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 
 /** One immutable, locally verified pair of models and independent calibrators. No runtime training. */
 public final class AssetCardModelBundle implements AutoCloseable {
@@ -64,6 +67,136 @@ public final class AssetCardModelBundle implements AutoCloseable {
                              Thresholds thresholds,List<String> reasons) {
         public Prediction { reasons=List.copyOf(reasons); }
     }
+
+    /** A configured, externally reviewed manifest identity. Invalid descriptors fail only their asset. */
+    public record Source(Path path,String expectedManifestSha256) {
+        public Source {
+            path=path==null?null:path.toAbsolutePath().normalize();
+            expectedManifestSha256=expectedManifestSha256==null?"":expectedManifestSha256.trim().toLowerCase(Locale.ROOT);
+        }
+    }
+    public record ReloadResult(String symbol,boolean available,boolean changed,String reason) {}
+
+    /**
+     * Asset-isolated, verified replacement. Loading and inference never hold the registry monitor.
+     * A lease pins one model/calibration/threshold/risk identity across a complete card calculation.
+     */
+    public static final class Registry implements AutoCloseable {
+        private final Function<Source,AssetCardModelBundle> loader;
+        private final Map<String,Slot> slots=new HashMap<>();
+        private long revision;
+        private boolean closed;
+        public Registry() { this(source->load(source.path(),source.expectedManifestSha256())); }
+        private Registry(Function<Source,AssetCardModelBundle> loader) { this.loader=Objects.requireNonNull(loader); }
+
+        /** Full desired configuration; omission revokes an asset. No failed replacement retains old confidence. */
+        public Map<String,ReloadResult> reconcile(Map<String,Source> desiredSources) {
+            Map<String,Source> desired=normalizeSources(desiredSources);
+            long generation;
+            Set<String> symbols;
+            synchronized(this) {
+                if(closed) return Map.of();
+                generation=++revision;
+                symbols=new TreeSet<>(slots.keySet()); symbols.addAll(desired.keySet());
+                for(String symbol:symbols) slots.computeIfAbsent(symbol,ignored->new Slot());
+            }
+            Map<String,ReloadResult> results=new LinkedHashMap<>();
+            for(String symbol:symbols) {
+                Source source=desired.get(symbol);
+                synchronized(this) {
+                    if(closed || revision!=generation) break;
+                    Slot slot=slots.get(symbol);
+                    if(source!=null && source.equals(slot.source) && slot.entry!=null && slot.entry.bundle.validated()) {
+                        results.put(symbol,new ReloadResult(symbol,true,false,null)); continue;
+                    }
+                }
+                AssetCardModelBundle candidate=source==null?unavailable("MODEL_NOT_CONFIGURED"):verifiedCandidate(symbol,source);
+                Entry retired=null;
+                boolean accepted;
+                synchronized(this) {
+                    accepted=!closed && revision==generation;
+                    if(accepted) {
+                        Slot slot=slots.get(symbol); retired=slot.entry;
+                        slot.source=source; slot.entry=new Entry(candidate);
+                        results.put(symbol,new ReloadResult(symbol,candidate.validated(),true,candidate.reason()));
+                    }
+                }
+                if(retired!=null) retired.release();
+                if(!accepted) { candidate.close(); break; }
+            }
+            return Map.copyOf(results);
+        }
+
+        private AssetCardModelBundle verifiedCandidate(String symbol,Source source) {
+            AssetCardModelBundle candidate=null;
+            try {
+                candidate=loader.apply(source);
+                if(candidate==null) return unavailable("MODEL_BUNDLE_LOAD_FAILED");
+                if(!candidate.validated()) {
+                    String reason=candidate.reason(); candidate.close();
+                    return unavailable(reason==null?"MODEL_EXPIRED_OR_NOT_YET_VALID":reason);
+                }
+                if(!candidate.validatedAssets().equals(Set.of(symbol))) {
+                    candidate.close(); return unavailable("BUNDLE_ASSET_IDENTITY_MISMATCH");
+                }
+                return candidate;
+            } catch(RuntimeException | LinkageError failure) {
+                if(candidate!=null) candidate.close();
+                return unavailable("MODEL_BUNDLE_LOAD_FAILED");
+            }
+        }
+
+        public synchronized Lease acquire(String symbol) {
+            String key=canonicalSymbol(symbol);
+            Slot slot=slots.get(key);
+            if(closed) return new Lease(new Entry(unavailable("MODEL_REGISTRY_CLOSED")));
+            if(slot==null || slot.entry==null) return new Lease(new Entry(unavailable("MODEL_NOT_CONFIGURED")));
+            AssetCardModelBundle bundle=slot.entry.bundle;
+            if(!bundle.validated()) return new Lease(new Entry(unavailable(bundle.reason()==null?"MODEL_EXPIRED_OR_NOT_YET_VALID":bundle.reason())));
+            slot.entry.retain(); return new Lease(slot.entry);
+        }
+
+        @Override public void close() {
+            List<Entry> retired=new ArrayList<>();
+            synchronized(this) {
+                if(closed) return;
+                closed=true; ++revision;
+                for(Slot slot:slots.values()) if(slot.entry!=null) retired.add(slot.entry);
+                slots.clear();
+            }
+            retired.forEach(Entry::release);
+        }
+        private static final class Slot { private Source source; private Entry entry; }
+        private static final class Entry {
+            private final AssetCardModelBundle bundle;
+            private final AtomicInteger references=new AtomicInteger(1);
+            private Entry(AssetCardModelBundle bundle) { this.bundle=bundle; }
+            private void retain() { references.incrementAndGet(); }
+            private void release() { if(references.decrementAndGet()==0) bundle.close(); }
+        }
+        public static final class Lease implements AutoCloseable {
+            private final Entry entry;
+            private final AtomicBoolean closed=new AtomicBoolean();
+            private Lease(Entry entry) { this.entry=entry; }
+            public AssetCardModelBundle bundle() {
+                if(closed.get()) throw new IllegalStateException("MODEL_LEASE_CLOSED");
+                return entry.bundle;
+            }
+            @Override public void close() { if(closed.compareAndSet(false,true)) entry.release(); }
+        }
+    }
+    static Map<String,Source> normalizeSources(Map<String,Source> sources) {
+        if(sources==null || sources.isEmpty()) return Map.of();
+        Map<String,Source> result=new TreeMap<>();
+        for(var entry:sources.entrySet()) {
+            String symbol=canonicalSymbol(entry.getKey());
+            require(symbol.matches("[A-Z0-9]{2,32}"),"MODEL_REQUIRES_EXACT_SPOT_SYMBOL");
+            require(entry.getValue()!=null,"MISSING_MODEL_SOURCE");
+            require(result.putIfAbsent(symbol,entry.getValue())==null,"DUPLICATE_MODEL_SYMBOL");
+        }
+        return Map.copyOf(result);
+    }
+    private static String canonicalSymbol(String symbol) { return symbol==null?"":symbol.trim().toUpperCase(Locale.ROOT); }
 
     private final Booster longModel;
     private final Booster shortModel;

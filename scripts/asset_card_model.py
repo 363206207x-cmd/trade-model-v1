@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Point-in-time offline dual-XGBoost asset-card pipeline. No network/database access.
 
-CLI: status | inspect MANIFEST | prepare MANIFEST OUTPUT | train MANIFEST OUTPUT_DIR
+CLI: status | verify-export MANIFEST | inspect MANIFEST | prepare MANIFEST OUTPUT | train MANIFEST OUTPUT_DIR
 MANIFEST explicitly identifies REAL_HISTORICAL JSONL raw-frame files by SHA256.
 Each row has rawFrame (Java RawFrame JSON), future5m, future1m and provenance.
 No prepared feature vectors, current snapshots or synthetic production inputs are accepted.
@@ -32,6 +32,8 @@ EVIDENCE_FEATURES = ["spreadBps","depth10Bps","depth25Bps","bookImbalance","open
                      "fundingRate","longShortRatio","longLiquidation","shortLiquidation"]
 FEATURE_NAMES = [f"{interval}.{feature}" for interval in INTERVALS for feature in BAR_FEATURES] + EVIDENCE_FEATURES
 HORIZON = 14400
+LABEL_DEFINITION = "ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED"
+EXPORT_KIND = "ASSET_CARD_DB_EXPORT_V1"
 EPSILON = 1e-7  # numeric endpoint protection, not a strength or release threshold
 UNITS={**dict.fromkeys(("spotPrice","openInterest","longLiquidation","shortLiquidation","depth10Bps","depth25Bps"),"QUOTE_CURRENCY"),
        "fundingRate":"RATE","openInterestChange1h":"PERCENT","crowdingOpenInterestChange1h":"PERCENT",
@@ -93,12 +95,19 @@ def instant(value):
 
 
 def decode_json(text):
-    times={"at","asOf","openTime","closeTime","observedAt","availableAt","expiresAt","signalAsOf","capturedAt","trainEnd","calibrationEnd","validationEnd","testEnd","trainedThrough","validatedThrough","validUntil"}
+    times={"at","asOf","openTime","closeTime","observedAt","availableAt","expiresAt","signalAsOf","capturedAt","trainEnd","calibrationEnd","validationEnd","testEnd","trainedThrough","validatedThrough","validUntil","maturedAt","fromInclusive","toExclusive","availableAtCutoff","closed5mAt","labelEnd","labelAvailableAt"}
+    def unique_object(pairs):
+        result={}
+        for key,value in pairs:
+            if key in result: raise ValueError("Duplicate JSON identity key")
+            result[key]=value
+        return result
+    def reject_constant(value): raise ValueError("Nonfinite JSON values are forbidden")
     def normalize(value,key=None):
         if isinstance(value,dict): return {k:normalize(v,k) for k,v in value.items()}
         if isinstance(value,list): return [normalize(v) for v in value]
         return value if not isinstance(value,Decimal) or key in times else float(value)
-    return normalize(json.loads(text,parse_float=Decimal))
+    return normalize(json.loads(text,parse_float=Decimal,object_pairs_hook=unique_object,parse_constant=reject_constant))
 
 
 def json_default(value):
@@ -304,23 +313,191 @@ def future_bar_valid(bar,symbol,captured_at,provenance):
 def sha256(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _export_keys(value,required,optional=()):
+    if not isinstance(value,dict) or not set(required)<=set(value) or set(value)-set(required)-set(optional):
+        raise ValueError("Export fields must match the card-only schema; private/current/derived payloads are forbidden")
+
+
+def _source_identity(value):
+    keys=("provider","source","sourceVersion","instrument","unit")
+    _export_keys(value,keys)
+    if any(not isinstance(value[k],str) or not value[k].strip() for k in keys): raise ValueError("Incomplete source identity")
+    provider="COINGLASS" if value["source"].startswith("COINGLASS:") else "BINANCE_SPOT" if value["source"].startswith("BINANCE_SPOT") else None
+    if value["provider"]!=provider or value["sourceVersion"] in ("UNKNOWN","UNVERIFIED"):
+        raise ValueError("Source provider/version mismatch")
+    return tuple(value[k] for k in keys)
+
+
+def _source_set(values):
+    if not isinstance(values,list): raise ValueError("Explicit source identity list required")
+    identities=[_source_identity(value) for value in values]
+    if len(set(identities))!=len(identities): raise ValueError("Duplicate source identity")
+    return set(identities)
+
+
+def _observation_source(value):
+    return _source_identity({**{key:value.get(key) for key in ("source","sourceVersion","instrument","unit")},
+        "provider":"COINGLASS" if str(value.get("source","")).startswith("COINGLASS:") else "BINANCE_SPOT"})
+
+
+def _export_observation(value,symbol,key,at,provenance):
+    _export_keys(value,("value","source","sourceVersion","instrument","unit","observedAt","availableAt","expiresAt"),("observationId",))
+    if not valid_observation(symbol,key,value,at) or not registered_observation(value,provenance):
+        raise ValueError("Observation is unregistered, mixed, expired or unavailable at the original signal cutoff")
+    if key=="spotPrice" and not re.fullmatch(r"0|[1-9][0-9]*",str(value.get("observationId",""))):
+        raise ValueError("Actual immutable aggregate trade identity required")
+    return _observation_source(value)
+
+
+def validate_card_export(manifest,records):
+    """Validate Java card-only file exports without DB access, trusting neither labels nor prepared features."""
+    _export_keys(manifest,("schemaVersion","exportKind","symbol","featureVersion","labelDefinition","range","recordCount","sourceVersions","provenance"),
+        ("files","modelVersion","calibrationVersion","thresholdVersion","releasePolicy","validUntil","thresholdCandidates","walkForward","xgboostParams","numBoostRound",
+         "exclusions","modelMode","productionModelReady"))
+    if type(manifest["schemaVersion"]) is not int or manifest["schemaVersion"]!=1 or manifest["exportKind"]!=EXPORT_KIND:
+        raise ValueError("Unsupported card export schema")
+    if "modelMode" in manifest and manifest["modelMode"]!="SHADOW" or "productionModelReady" in manifest and manifest["productionModelReady"] is not False:
+        raise ValueError("An offline export cannot authorize model release or claim production readiness")
+    if "exclusions" in manifest:
+        exclusions=manifest["exclusions"]
+        if not isinstance(exclusions,dict) or any(not isinstance(key,str) or not key.strip() or type(count) is not int or count<0 for key,count in exclusions.items()):
+            raise ValueError("Export exclusions must be explicit nonnegative integer counts")
+    symbol=manifest["symbol"]
+    if instrument(symbol) is None or manifest["featureVersion"]!=FEATURE_VERSION or manifest["labelDefinition"]!=LABEL_DEFINITION:
+        raise ValueError("Export symbol/feature/label identity mismatch")
+    if type(manifest["recordCount"]) is not int or manifest["recordCount"]<0 or manifest["recordCount"]!=len(records):
+        raise ValueError("Export record count mismatch")
+    _export_keys(manifest["range"],("fromInclusive","toExclusive","availableAtCutoff"))
+    start,stop,cutoff=(timestamp(manifest["range"][key]) for key in ("fromInclusive","toExclusive","availableAtCutoff"))
+    provenance=manifest["provenance"]; validate_provenance(provenance)
+    _export_keys(provenance,("kind","datasetVersion","source","availabilityBasis","capturedAt","sources"))
+    captured=timestamp(provenance["capturedAt"])
+    if not start<stop<=cutoff<=captured: raise ValueError("Invalid immutable export range/capture cutoff")
+    sources=_source_set(provenance["sources"])
+    if _source_set(manifest["sourceVersions"])!=sources: raise ValueError("Export source-version manifest mismatch")
+    seen=set(); observed_sources=set()
+    bar_fields=("openTime","closeTime","availableAt","open","high","low","close")
+    bar_optional=("volume","takerBuyBaseVolume","tradeCount","symbol","interval","instrument","source","sourceVersion","unit")
+    label_fields=("symbol","side","featureVersion","labelDefinition","signalTradeId","instrument","sourceVersion","signalAsOf","maturedAt","outcome","y")
+    for record in records:
+        _export_keys(record,("rawFrame","future5m","future1m","horizonTrade","labelResults","provenance"))
+        row_provenance=record["provenance"]; validate_provenance(row_provenance)
+        _export_keys(row_provenance,("kind","datasetVersion","source","availabilityBasis","capturedAt","sources"))
+        row_sources=_source_set(row_provenance["sources"])
+        if row_provenance["datasetVersion"]!=provenance["datasetVersion"] or not row_sources<=sources:
+            raise ValueError("Mixed dataset/source versions")
+        row_capture=timestamp(row_provenance["capturedAt"])
+        if row_capture>captured: raise ValueError("Record capture exceeds the manifest capture")
+        raw=record["rawFrame"]; _export_keys(raw,("symbol","signalAsOf","bars","evidence"))
+        as_of=timestamp(raw["signalAsOf"]); end=as_of+HORIZON
+        if raw["symbol"]!=symbol or not start<=as_of<stop or (symbol,as_of) in seen:
+            raise ValueError("Duplicate or out-of-range symbol/signal identity")
+        seen.add((symbol,as_of)); _export_keys(raw["bars"],INTERVALS)
+        for interval,step in INTERVALS.items():
+            bars=raw["bars"][interval]
+            if not isinstance(bars,list): raise ValueError("Raw closed bars must be explicit")
+            for bar in bars:
+                _export_keys(bar,bar_fields,bar_optional)
+                if not timestamp(bar["openTime"])<timestamp(bar["closeTime"])<=timestamp(bar["availableAt"])<=as_of:
+                    raise ValueError("Raw bars cannot be backfilled across the original availability cutoff")
+                if "symbol" in bar and bar["symbol"]!=symbol or "instrument" in bar and bar["instrument"]!=instrument(symbol):
+                    raise ValueError("Mixed raw bar instrument")
+                if "interval" in bar and bar["interval"]!=interval: raise ValueError("Mixed raw bar interval")
+        if not isinstance(raw["evidence"],dict): raise ValueError("Raw evidence object required")
+        actual_sources={_export_observation(value,symbol,key,as_of,row_provenance) for key,value in raw["evidence"].items()}
+        price=raw["evidence"].get("spotPrice")
+        if price is None: raise ValueError("Original signal trade is missing")
+        frame=build_frame(raw)
+        if not finite(frame["atr"]) or frame["atr"]<=0: raise ValueError("Original fixed-at-signal ATR unavailable")
+        future_available=[end]
+        for key,interval in (("future5m","5m"),("future1m","1m")):
+            if not isinstance(record[key],list): raise ValueError("Explicit future path required")
+            seen_bars=set()
+            for bar in record[key]:
+                _export_keys(bar,bar_fields,bar_optional)
+                if not future_bar_valid(bar,symbol,min(cutoff,row_capture),row_provenance): raise ValueError("Unregistered or unavailable future bar")
+                if "symbol" in bar and bar["symbol"]!=symbol or "interval" in bar and bar["interval"]!=interval: raise ValueError("Mixed future bar identity")
+                opened=timestamp(bar["openTime"]); step=300 if interval=="5m" else 60
+                if (bar["source"] not in ("BINANCE_SPOT","BINANCE_SPOT_CLOSED_"+interval.upper()) or opened%step!=0
+                        or not contiguous([bar],opened,1,step) or timestamp(bar["closeTime"])>opened+step):
+                    raise ValueError("Future path has an invalid OHLC, timeframe or closed UTC boundary")
+                if opened in seen_bars: raise ValueError("Duplicate future bar identity")
+                seen_bars.add(opened); future_available.append(timestamp(bar["availableAt"])); actual_sources.add(_observation_source(bar))
+        horizon=record["horizonTrade"]
+        if horizon is not None:
+            actual_sources.add(_export_observation(horizon,symbol,"spotPrice",end,row_provenance))
+            future_available.append(timestamp(horizon["availableAt"]))
+        _export_keys(record["labelResults"],("LONG","SHORT"))
+        for side in ("LONG","SHORT"):
+            label=record["labelResults"][side]; _export_keys(label,label_fields)
+            if (label["symbol"]!=symbol or label["side"]!=side or label["featureVersion"]!=FEATURE_VERSION
+                    or label["labelDefinition"]!=LABEL_DEFINITION or label["instrument"]!=instrument(symbol)
+                    or label["sourceVersion"]!=price["sourceVersion"] or type(label["signalTradeId"]) is not int
+                    or label["signalTradeId"]<0 or str(label["signalTradeId"])!=price["observationId"]
+                    or timestamp(label["signalAsOf"])!=as_of): raise ValueError("Label immutable identity mismatch")
+            matured=timestamp(label["maturedAt"])
+            if not max(future_available)<=matured<=min(cutoff,row_capture): raise ValueError("Label matured before evidence was actually available")
+            y,outcome=first_touch(price["value"],frame["atr"],as_of,record["future5m"],record["future1m"],side)
+            if label["outcome"]!=outcome or label["y"]!=y or label["y"] is not None and type(label["y"]) is not int:
+                raise ValueError("Stored label disagrees with independent frozen first-touch reconstruction")
+            if outcome=="TIMEOUT" and horizon is None: raise ValueError("Timeout requires a real point-in-time horizon trade")
+        if actual_sources!=row_sources: raise ValueError("Record provenance must describe actual observation tuples, not declared unused providers")
+        observed_sources.update(actual_sources)
+    if records and observed_sources!=sources: raise ValueError("Manifest sources must be derived from the exported observations")
+
+
+def _local_dataset_file(parent,descriptor):
+    name=descriptor.get("path")
+    if not isinstance(name,str) or not name or pathlib.Path(name).is_absolute() or ".." in pathlib.Path(name).parts:
+        raise ValueError("Only manifest-local raw frame files are accepted")
+    current=parent
+    for part in pathlib.Path(name).parts:
+        current=current/part
+        if current.is_symlink(): raise ValueError("Dataset symlinks are forbidden")
+    if not current.is_file() or not current.resolve().is_relative_to(parent): raise ValueError("Dataset file missing or outside manifest")
+    return current
+
+
 def read_dataset(manifest_path):
     path=pathlib.Path(manifest_path).resolve(); manifest=decode_json(path.read_text())
     validate_provenance(manifest["provenance"])
     records=[]
     if not manifest.get("files"): raise ValueError("No explicit historical files; actual sample count UNKNOWN")
+    seen_files=set()
     for descriptor in manifest["files"]:
-        data_path=(path.parent/descriptor["path"]).resolve()
-        if not data_path.is_relative_to(path.parent) or data_path.is_symlink() or descriptor.get("kind")!="RAW_FRAMES": raise ValueError("Only manifest-local raw frame files are accepted")
-        if sha256(data_path)!=descriptor["sha256"]: raise ValueError("Historical file checksum mismatch")
-        for line in data_path.read_text().splitlines():
+        data_path=_local_dataset_file(path.parent,descriptor)
+        if data_path in seen_files or descriptor.get("kind")!="RAW_FRAMES": raise ValueError("Duplicate or non-raw historical file")
+        seen_files.add(data_path); encoded=data_path.read_bytes()
+        if hashlib.sha256(encoded).hexdigest()!=descriptor["sha256"]: raise ValueError("Historical file checksum mismatch")
+        count=0
+        for line in encoded.decode("utf-8").splitlines():
             if line.strip():
                 record=decode_json(line); validate_provenance(record["provenance"])
                 if record["provenance"]["datasetVersion"]!=manifest["provenance"]["datasetVersion"]: raise ValueError("Mixed dataset versions")
                 if any(source not in manifest["provenance"]["sources"] for source in record["provenance"]["sources"]): raise ValueError("Record expands the manifest source identity allowlist")
                 if "vector" in record or "features" in record or "currentSnapshot" in record: raise ValueError("Features must be rebuilt from genuine raw point-in-time inputs")
-                records.append(record)
+                records.append(record); count+=1
+        if manifest.get("exportKind") is not None:
+            _export_keys(descriptor,("path","kind","count","sha256"))
+            if type(descriptor["count"]) is not int or descriptor["count"]!=count: raise ValueError("Export file record count mismatch")
+    if manifest.get("exportKind") is not None: validate_card_export(manifest,records)
+    elif any("labelResults" in record for record in records): raise ValueError("Card labels require their immutable export manifest identity")
     return manifest,records
+
+
+def verify_export(manifest_path):
+    path=pathlib.Path(manifest_path); digest=sha256(path)
+    manifest,records=read_dataset(path)
+    if manifest.get("exportKind")!=EXPORT_KIND or digest!=sha256(path): raise ValueError("Explicit unchanged card export manifest required")
+    outcomes={side:{} for side in ("LONG","SHORT")}
+    for record in records:
+        for side in outcomes:
+            outcome=record["labelResults"][side]["outcome"]
+            outcomes[side][outcome]=outcomes[side].get(outcome,0)+1
+    return {"exportKind":EXPORT_KIND,"manifestSha256":digest,"symbol":manifest["symbol"],"featureVersion":FEATURE_VERSION,
+        "labelDefinition":LABEL_DEFINITION,"range":manifest["range"],"recordCount":len(records),"labelOutcomes":outcomes,
+        "sourceVersions":manifest["sourceVersions"],"mode":"SHADOW","productionModelReady":False,
+        "trainingReadiness":"UNVALIDATED_REQUIRES_EXPLICIT_COSTS_SPLITS_AND_REAL_MODEL_EVIDENCE"}
 
 
 def prepare_records(records, policy):
@@ -368,8 +545,13 @@ def prepare_records(records, policy):
         # Volatility strata boundaries are frozen policy values, never fitted on test outcomes.
         cuts=policy["volatilityStrata"]
         bucket="LOW" if vol<cuts[0] else "MEDIUM" if vol<cuts[1] else "HIGH"
+        # The target interval remains exactly four hours, but its label is not knowable
+        # until every required surrounding closed bar (and persisted label) is available.
+        label_available=max([end]+[timestamp(bar["availableAt"]) for bar in future]
+            +[timestamp(bar["availableAt"]) for bar in record.get("future1m",[]) if first<=timestamp(bar["openTime"])<math.ceil(end/300)*300]
+            +[timestamp(label["maturedAt"]) for label in record.get("labelResults",{}).values()])
         prepared.append({"symbol":frame["symbol"],"signalAsOf":timestamp(frame["signalAsOf"]),
-                         "labelEnd":timestamp(frame["signalAsOf"])+HORIZON,"vector":frame["vector"],
+                         "labelEnd":end,"labelAvailableAt":label_available,"vector":frame["vector"],
                          "labels":labels,"netReturns":returns,"regime":frame["fourHourTrend"],"volatility":bucket,
                          "realInputs":frame["realInputs"],"frame":frame,"missingPattern":missing_pattern(frame["vector"])})
     return sorted(prepared,key=lambda r:(r["signalAsOf"],r["symbol"])),excluded
@@ -378,10 +560,12 @@ def prepare_records(records, policy):
 def temporal_split(rows, boundaries):
     ends=[timestamp(boundaries[k]) for k in ("trainEnd","calibrationEnd","validationEnd","testEnd")]
     if any(b<=a for a,b in zip(ends,ends[1:])): raise ValueError("Strict chronological independent split boundaries required")
+    if any("labelAvailableAt" not in row or timestamp(row["labelAvailableAt"])<timestamp(row["labelEnd"]) for row in rows):
+        raise ValueError("Actual label availability at or after the fixed horizon is mandatory")
     parts=[]
     for i,end in enumerate(ends):
         start=-math.inf if i==0 else ends[i-1]+HORIZON
-        parts.append([row for row in rows if row["signalAsOf"]>=start and row["labelEnd"]<=end])
+        parts.append([row for row in rows if row["signalAsOf"]>=start and row["labelEnd"]<=end and timestamp(row["labelAvailableAt"])<=end])
     if any(not part for part in parts): raise ValueError("Empty purged/4h-embargo split; no readiness shortcut")
     for left,right in zip(parts,parts[1:]):
         if max(r["labelEnd"] for r in left)+HORIZON>min(r["signalAsOf"] for r in right): raise ValueError("Overlapping label intervals or missing 4h embargo")
@@ -692,7 +876,8 @@ def train_fold(parts,manifest):
     report["thresholdSelectionTiers"]=selection_tiers; report["rangeEvidence"]=range_evidence
     report["thresholds"]=thresholds; report["calibrators"]=calibrators
     report["splits"]=[{"name":name,"count":len(rows),"start":instant(min(r["signalAsOf"] for r in rows)),
-                       "end":instant(max(r["signalAsOf"] for r in rows)),"labelEnd":instant(max(r["labelEnd"] for r in rows))}
+                       "end":instant(max(r["signalAsOf"] for r in rows)),"labelEnd":instant(max(r["labelEnd"] for r in rows)),
+                       "labelAvailableAt":instant(max(timestamp(r["labelAvailableAt"]) for r in rows))}
                       for name,rows in zip(("TRAIN","CALIBRATION","VALIDATION","TEST"),parts)]
     report["embargoSeconds"]=HORIZON
     report["passed"]=release_pass(report,policy)
@@ -742,7 +927,7 @@ def train_bundle(manifest,rows,excluded,output):
     for bounds in folds:
         parts=temporal_split(rows,bounds)
         if min(r["signalAsOf"] for r in parts[-1])<=previous_test_end: raise ValueError("Walk-forward final test folds overlap")
-        previous_test_end=max(r["labelEnd"] for r in parts[-1])
+        previous_test_end=max(timestamp(r["labelAvailableAt"]) for r in parts[-1])
         models,calibrators,thresholds,report,distributions=train_fold(parts,manifest)
         reports.append(report)
     required_sides={"LONG","SHORT","NON_DIRECTIONAL"}
@@ -754,7 +939,7 @@ def train_bundle(manifest,rows,excluded,output):
         return values[lo]+(values[hi]-values[lo])*(x-lo)
     train=parts[0]
     lifecycle={"dataVersion":manifest["provenance"]["datasetVersion"],"riskVersion":policy["riskVersion"],
-               "trainedThrough":report["splits"][1]["labelEnd"],"validatedThrough":report["splits"][3]["labelEnd"],"validUntil":manifest["validUntil"],
+               "trainedThrough":report["splits"][1]["labelAvailableAt"],"validatedThrough":report["splits"][3]["labelAvailableAt"],"validUntil":manifest["validUntil"],
                "missingPatterns":sorted(report["patternMetrics"]),"maxFeatureOutlierFraction":policy["maxFeatureOutlierFraction"],
                "featureLower":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftLowerQuantile"]) for i in range(len(FEATURE_NAMES))],
                "featureUpper":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftUpperQuantile"]) for i in range(len(FEATURE_NAMES))]}
@@ -785,7 +970,7 @@ def train_bundle(manifest,rows,excluded,output):
     bundle={"schemaVersion":2,"dataKind":"REAL_HISTORICAL","featureVersion":FEATURE_VERSION,"atrDefinition":ATR_DEFINITION,"lifecycle":lifecycle,
             "featureNames":FEATURE_NAMES,"modelVersion":manifest["modelVersion"],"calibrationVersion":manifest["calibrationVersion"],
             "thresholdVersion":manifest["thresholdVersion"],"xgboostVersion":XGBOOST_VERSION,"horizonSeconds":HORIZON,
-            "labelDefinition":"ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED",
+            "labelDefinition":LABEL_DEFINITION,
             "releasePolicy":policy,"files":{name:sha256(out/name) for name in ("long.ubj","short.ubj","calibration.json","thresholds.json","risk-distributions.json","validation.json")}}
     write_json(out/"manifest.json",bundle) # manifest is the atomic publication marker, written last
     return {"productionModelReady":True,"manifestSha256":sha256(out/"manifest.json"),"report":final_report}
@@ -804,12 +989,15 @@ def validate_training_manifest(manifest):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command",choices=("status","inspect","prepare","train"))
+    parser.add_argument("command",choices=("status","verify-export","inspect","prepare","train"))
     parser.add_argument("manifest",nargs="?"); parser.add_argument("output",nargs="?")
     args=parser.parse_args()
     if args.command=="status":
         print(json.dumps({"mode":"SHADOW","productionModelReady":False,"actualSamples":"UNKNOWN","metrics":"UNKNOWN"})); return
     if not args.manifest: parser.error("An explicit real historical manifest is required")
+    if args.command=="verify-export":
+        if args.output: parser.error("verify-export is read-only and does not accept an output path")
+        print(json.dumps(verify_export(args.manifest),sort_keys=True,allow_nan=False,default=json_default)); return
     manifest,records=read_dataset(args.manifest)
     if args.command=="inspect":
         print(json.dumps({"dataKind":"REAL_HISTORICAL","rawRecords":len(records),"symbols":sorted({r["rawFrame"]["symbol"] for r in records}),

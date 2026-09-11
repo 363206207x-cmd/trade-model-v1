@@ -1,5 +1,100 @@
 # Asset-card live signal implementation evidence
 
+## V42 maturity/export/asset-registry continuation (2026-09-11)
+
+This continuation preserves `cccc696d84af42f8756e7c76f5d701a94ac6c203` and PR #1295.
+The active implementation allowlist remains **49**; none of the four proposed
+infrastructure paths below has been created or edited. No registration, merge,
+deployment, persistent external database connection, secret read or Owner-data action occurred.
+
+### Implemented within the existing paths
+
+- Application startup schedules a separate card-label worker, gated by enabled and writer readiness.
+  It scans immutable INFERENCE records independently of displayed/subscribed assets, with bounded
+  keyset pages and restart/retry coverage. Real 1m/5m paths and immutable actual trade observations
+  produce separate LONG/SHORT labels. Missing horizon data stays pending; unresolved within-minute
+  ordering is excluded. First-passage barriers and the actual four-hour cutoff are unchanged.
+- The original raw feature frame is rebuilt and compared to the stored frame at the original
+  signal clock. No future observation is used to repair it. Labels bind the inference key, side,
+  feature/label/source versions and evidence SHA-256. Identical concurrent labels are idempotent;
+  contradictory immutable labels raise an explicit conflict instead of overwriting either result.
+- Nanosecond source clocks remain in JSON. Database-column comparison allows only the database's
+  microsecond representation difference; point-in-time eligibility still checks original JSON.
+  An observation available one nanosecond after the horizon remains forbidden even when PostgreSQL
+  rounds its column to the boundary. Disposable PostgreSQL and H2 regressions cover this distinction.
+- An explicitly enabled offline export service streams only card-owned records to a unique local
+  directory. No HTTP route or request-triggered export was added. Both persisted side labels must
+  match the same raw/future/horizon evidence. Dataset versions bind scope **and actual population**;
+  final JSONL/manifest hashes, count, symbol, versions, provenance and time boundaries are reproducible.
+  A manifest is published only after the stream/checksum completes. The temporary spool is then removed.
+- Python `verify-export` independently rebuilds labels and verifies exact fields, immutable clocks,
+  source tuples, population, local paths and checksums; it neither connects to a database nor trains.
+  The fixed `labelEnd=signalAsOf+4h` is separate from actual `labelAvailableAt`; temporal partitions
+  and lifecycle evidence cannot include a label before all required closed bars were available.
+- Registry leases select one independently verified asset bundle for model, calibration, thresholds
+  and risk distributions. Replacement, expiry and failure are isolated per symbol. In-flight leases
+  retain one identity, and repeated processing of a closed bar cannot relabel old probabilities with
+  a new model/feature/threshold version. No missing-asset fallback or old confidence fallback exists.
+
+Validation before the final full run: comprehensive focused **368 / 0 failures / 0 errors / 0 skips**;
+then the startup lifecycle suite **37 / 0 / 0 / 0**. Python **43 / 0 / 0 / 0**; Java-to-Python export
+verification executed, including both first-passage sides. Card JS and timestamp matrices, syntax,
+diff, Product Source Gate, task validation, exact machine gates and workflow-contract pass.
+Final repository `./mvnw test -q`: **5,462 tests / 517 suites, 0 failures, 0 errors, 13 skips**, exit 0.
+Log `/private/tmp/v42-label-full-maven.log`, SHA-256
+`75796ef8336270229b4e0212550b7844a60ed63b224e7e6879b54396d82f531d`.
+This includes the final 18-test Mapper suite and actual disposable PostgreSQL nanosecond/microsecond
+regression. The 13 skips are the same seven explicitly named controlled-environment classes in the
+previous-head table below (1+7+1+1+1+1+1); no skip predicate was removed, added or widened.
+Java 17, fixed Python/XGBoost 2.1.4 and process-only Docker API 1.44 were used. No real Provider opt-in.
+Exact-head CI remains pending the continuation push; prior-head CI does not substitute for it.
+
+### Actual Linux attempt and missing real evidence
+
+A new source-only context was built using the unchanged final Dockerfile and official upstreams:
+`/private/tmp/v42-final-amd64.lVMh2m/context.tar`, SHA-256
+`7f71e338722b06aad64e0e735a2bb91df4bc3f80b6dddf5a63d2d1906f7fe534`.
+`docker build --pull=false --platform linux/amd64` exited **1** obtaining the
+`docker/dockerfile:1.7` anonymous token from `auth.docker.io` (EOF).
+No final image ID, libgomp/native load or final-image prediction exists. No proxy/third-party mirror
+or cached old JRE image was substituted. This context is frozen evidence, not later test edits.
+The server `uname -m` was not executed because Tailscale requested interactive verification;
+`STAGING_ARCH=UNKNOWN`. Local Docker is Linux aarch64 and is not server-architecture evidence.
+
+`MODEL_MODE=SHADOW`, `PRODUCTION_MODEL_READY=NO`, `CONFIDENCE_DISPLAY=—` for unvalidated new models.
+Real training/calibration/final-test counts, effective four-hour clusters, Brier/ECE/LogLoss,
+RANGE/WATCH/time-out-of-sample evidence: **NOT_AVAILABLE**. Synthetic fixtures validate plumbing only.
+`LINUX_NATIVE_RUNTIME=FAIL`, `PR_1295_MERGE=NO`, `DEPLOYMENT=NO`, `CURRENT_PHASE_DONE=NO`.
+
+### One-time read-only infrastructure dependency closure
+
+Only **four** new paths are necessary (proposed 49→53); the existing systemd/JAR Staging path is
+retained. These are a proposed authorization list, **not an effective allowlist or permission grant**.
+No P3H full-stack migration, fourth table, V25, broad role privilege, secret output or deployment is proposed.
+
+| PATH | WHY_REQUIRED | EXACT_CHANGE | SECURITY_BOUNDARY | TEST_COVERAGE |
+| --- | --- | --- | --- | --- |
+| `src/main/java/org/example/trademodel/assetcard/AssetCardDataSourceConfiguration.java` | Card Mapper currently shares the application JdbcTemplate | Card-only closeable Hikari/DataSource/JdbcTemplate holder with runtime credential-file loading | Must not replace default DataSource/JdbcOperations; missing/invalid secret fails closed; never fall back to application write access | Existing AssetCardIsolationIntegrationTest + AssetCardMapperIntegrationTest: bean separation, missing credentials, close/rotation |
+| `deploy/staging/asset-card-role-bootstrap.sql` | V24 intentionally contains no role grants; existing P3H broad SQL is unsuitable | Define only the dedicated card role's CONNECT, public USAGE and exact SELECT/INSERT/UPDATE/DELETE on tm_asset_card_snapshot, tm_asset_card_spot_bar, tm_asset_card_feature_history | Only rine_logic_staging; no changes to existing roles/ACL/owners; no CREATE/SUPERUSER/role inheritance; excess PUBLIC/inherited access blocks instead of revoking unrelated rights; external execution remains unauthorized | Existing V24 temporary PostgreSQL test: three-table success, all other table denial, unchanged old ACL/data |
+| `deploy/staging/asset-card-runtime-credentials.sh` | No dedicated card credential installation/rotation and model-path validation entry exists | Protected credential preparation/version rotation, new-connection validation and exact read-only bundle directory/SHA checks | No passwords via argv/log/plain environment; no other credentials; no implicit service restart, deployment or DB action; actual activation requires separate authority | Existing AssetCardIsolationIntegrationTest: temporary directories, fake commands, permissions, symlink rejection, failed rotation and redaction |
+| `deploy/staging/rine-logic-asset-card.conf.template` | Existing service has no card-specific credential and model mount adaptation | Card-only LoadCredentialEncrypted, non-secret credential path and per-symbol bundle/SHA, BindReadOnlyPaths | Do not override ExecStart/User/SPRING_CONFIG_IMPORT; no generic filesystem or login changes; SHADOW remains default | Existing isolation/template tests and model tests: missing config, read-only mount, checksum/identity failure |
+
+Existing authorized paths required by that same dependency closure (no additional registration):
+
+| PATH | WHY_REQUIRED | EXACT_CHANGE | SECURITY_BOUNDARY | TEST_COVERAGE |
+| --- | --- | --- | --- | --- |
+| `src/main/java/org/example/trademodel/mapper/AssetCardMapper.java` | Separate card writes from shared historical-bar reads | Route the three card tables only to dedicated connection; keep canonical bar reads on existing read-only path | No new rights or write fallback; check effective least privilege | Mapper/V24 isolated database tests |
+| `src/main/java/org/example/trademodel/assetcard/AssetCardProperties.java` | Dedicated runtime config | Non-secret connection/credential file identity and existing per-symbol bundle path/SHA configuration | Disabled by default; no printable password property | Isolation/config tests |
+| `src/main/java/org/example/trademodel/assetcard/AssetCardService.java` | Writer readiness/close lifecycle | Connect card-only holder readiness and closure; preserve independent price path | No request-driven writes or automatic enablement | Service and isolation tests |
+| `src/test/java/org/example/trademodel/assetcard/AssetCardIsolationIntegrationTest.java` | Validate configuration, credential and template boundary | Add isolated bean/file/fake-command regressions | No real secrets or deployment | Default bean unchanged, no fallback, rotation, read-only models |
+| `src/test/java/org/example/trademodel/mapper/AssetCardMapperIntegrationTest.java` | Validate connection routing | Add dual-datasource attribution and denied fallback | Disposable database only | Preserve all CAS/immutable-label regressions |
+| `src/test/java/org/example/trademodel/postgresql/V24AssetCardLiveSignalMigrationContractTest.java` | Validate actual PostgreSQL ACL isolation | Dedicated test role three-table permissions; prove old ACL/data unchanged | Disposable container only; V24 DDL unchanged | All non-card tables denied |
+| `src/test/java/org/example/trademodel/assetcard/AssetCardModelBundleTest.java` | Model mount and final-image contract | Reuse model/SHA/identity test and add actual final-image read-only/native checks | Temporary test models only; not production readiness | Both UBJ loads and Python/Java parity in actual target architecture |
+| `Dockerfile` | Final Linux native evidence | Existing approved libgomp1 patch retained; rebuild actual image | No new package/base/USER/ENTRYPOINT change | Final image, not cached-container substitute |
+| `docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md` | Traceable acceptance | Record exact image/SHA/exit codes, permission tests and remaining gaps | No unobserved PASS or sensitive values | Evidence cross-check |
+
+## Previous-head V42 evidence (cccc696d; historical)
+
 ## V42 continuation status (2026-09-11)
 
 Current package: `V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE`.

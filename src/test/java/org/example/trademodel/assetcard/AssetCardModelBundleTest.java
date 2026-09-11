@@ -16,6 +16,166 @@ import static org.mockito.Mockito.*;
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardModelBundleTest {
     @TempDir Path directory;
+    @Test void registrySelectsOnlyTheExactValidatedAssetAndKeepsBundleIdentitiesIndependent() throws Exception {
+        var btc=source("BTC"); var eth=source("ETH");
+        try(var registry=registry(s->testBundle(s.equals(btc)?"BTCUSDT":"ETHUSDT",s.equals(btc)?"BTC":"ETH"))) {
+            registry.reconcile(Map.of("BTCUSDT",btc,"ETHUSDT",eth));
+            try(var b=registry.acquire("BTCUSDT"); var e=registry.acquire("ETHUSDT"); var missing=registry.acquire("SOLUSDT")) {
+                assertThat(b.bundle().validatedAssets()).containsExactly("BTCUSDT");
+                assertThat(e.bundle().validatedAssets()).containsExactly("ETHUSDT");
+                assertThat(b.bundle().modelVersion()).isEqualTo("TEST_BTC_MODEL");
+                assertThat(e.bundle().modelVersion()).isEqualTo("TEST_ETH_MODEL");
+                assertThat(b.bundle().calibrationVersion()).isNotEqualTo(e.bundle().calibrationVersion());
+                assertThat(b.bundle().thresholdVersion()).isNotEqualTo(e.bundle().thresholdVersion());
+                assertThat(b.bundle().riskVersion()).isNotEqualTo(e.bundle().riskVersion());
+                assertThat(missing.bundle().validated()).isFalse();
+            }
+        }
+    }
+    @Test void registryWrongAssetOrFailedReplacementRevokesOnlyThatSymbol() throws Exception {
+        var btc=source("BTC"); var eth=source("ETH"); var bad=source("BAD");
+        try(var registry=registry(s->{ if(s.equals(bad)) throw new UnsatisfiedLinkError("TEST_ONLY"); return testBundle(s.equals(btc)?"BTCUSDT":"ETHUSDT",s.equals(btc)?"BTC":"ETH"); })) {
+            registry.reconcile(Map.of("BTCUSDT",btc,"ETHUSDT",eth));
+            registry.reconcile(Map.of("BTCUSDT",bad,"ETHUSDT",eth));
+            try(var b=registry.acquire("BTCUSDT"); var e=registry.acquire("ETHUSDT")) {
+                assertThat(b.bundle().validated()).isFalse(); assertThat(b.bundle().thresholds()).isNull();
+                assertThat(e.bundle().validated()).isTrue();
+            }
+            registry.reconcile(Map.of("BTCUSDT",eth,"ETHUSDT",eth));
+            try(var b=registry.acquire("BTCUSDT"); var e=registry.acquire("ETHUSDT")) {
+                assertThat(b.bundle().validated()).isFalse();
+                assertThat(b.bundle().reason()).isEqualTo("BUNDLE_ASSET_IDENTITY_MISMATCH");
+                assertThat(e.bundle().validated()).isTrue();
+            }
+        }
+    }
+    @Test void registryReplacementKeepsAnAcquiredVersionAliveWithoutBlockingOtherAssets() throws Exception {
+        var old=source("OLD"); var replacement=source("NEW"); var eth=source("ETH");
+        try(var registry=registry(s->testBundle(s.equals(eth)?"ETHUSDT":"BTCUSDT",s.equals(old)?"OLD":s.equals(replacement)?"NEW":"ETH"))) {
+            registry.reconcile(Map.of("BTCUSDT",old,"ETHUSDT",eth));
+            var held=registry.acquire("BTCUSDT"); var oldBundle=held.bundle();
+            try {
+                registry.reconcile(Map.of("BTCUSDT",replacement,"ETHUSDT",eth));
+                assertThat(oldBundle.validated()).isTrue();
+                try(var current=registry.acquire("BTCUSDT"); var other=registry.acquire("ETHUSDT")) {
+                    assertThat(current.bundle().modelVersion()).isEqualTo("TEST_NEW_MODEL");
+                    assertThat(other.bundle().validated()).isTrue();
+                }
+            } finally { held.close(); }
+            assertThat(oldBundle.reason()).isEqualTo("MODEL_CLOSED");
+            held.close(); // resource release is idempotent
+            assertThatThrownBy(held::bundle).isInstanceOf(IllegalStateException.class);
+        }
+    }
+    @Test void expiredRemovedAndClosedRegistryNeverReturnAnotherAssetsModel() throws Exception {
+        var btc=source("BTC"); var expired=source("EXPIRED");
+        try(var registry=registry(s->{ var b=testBundle("BTCUSDT","BTC"); if(s.equals(expired)) expire(b); return b; })) {
+            registry.reconcile(Map.of("BTCUSDT",expired));
+            try(var lease=registry.acquire("BTCUSDT")) { assertThat(lease.bundle().validated()).isFalse(); }
+            registry.reconcile(Map.of("BTCUSDT",btc));
+            try(var lease=registry.acquire("BTCUSDT")) { expire(lease.bundle()); assertThat(lease.bundle().validated()).isFalse(); }
+            registry.reconcile(Map.of("BTCUSDT",btc));
+            try(var lease=registry.acquire("BTCUSDT")) { assertThat(lease.bundle().validated()).isTrue(); }
+            registry.reconcile(Map.of());
+            try(var lease=registry.acquire("BTCUSDT")) { assertThat(lease.bundle().validated()).isFalse(); }
+            registry.close();
+            registry.reconcile(Map.of("BTCUSDT",btc));
+            try(var lease=registry.acquire("BTCUSDT")) { assertThat(lease.bundle().validated()).isFalse(); }
+        }
+    }
+    @Test void configuredSourceMapIsImmutableExactAndShadowByDefault() {
+        var properties=new AssetCardProperties(); var values=new HashMap<String,AssetCardModelBundle.Source>();
+        values.put("btcusdt",source("BTC")); properties.setModelBundles(values); values.clear();
+        assertThat(properties.getModelBundles()).containsOnlyKeys("BTCUSDT");
+        assertThatThrownBy(()->properties.getModelBundles().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(properties.getModelMode()).isEqualTo(AssetCardProperties.ModelMode.SHADOW);
+        assertThat(properties.isEnabled()).isFalse();
+        assertThat(properties.getLabelMaturityBatchSize()).isEqualTo(128);
+        assertThat(properties.getLabelMaturityInterval()).isEqualTo(java.time.Duration.ofSeconds(60));
+        assertThat(properties.isTrainingExportEnabled()).isFalse();
+        assertThat(properties.getTrainingExportDirectory()).isNull();
+        assertThatThrownBy(()->properties.setModelBundles(Map.of("BTC*",source("BAD")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->properties.setModelBundles(Map.of("BTCUSDT",source("A"),"btcusdt",source("B")))).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void lateReplacementCannotOverwriteNewerAssetConfigurationOrResurrectClosedRegistry() throws Exception {
+        for(boolean closeDuringLoad:List.of(false,true)) {
+            var slow=source("SLOW"); var fast=source("FAST"); var eth=source("ETH");
+            var entered=new java.util.concurrent.CountDownLatch(1); var resume=new java.util.concurrent.CountDownLatch(1);
+            var discarded=new java.util.concurrent.atomic.AtomicReference<AssetCardModelBundle>();
+            var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
+            try(var registry=registry(s->{
+                var bundle=testBundle(s.equals(eth)?"ETHUSDT":"BTCUSDT",s.equals(slow)?"SLOW":s.equals(fast)?"FAST":"ETH");
+                if(s.equals(slow)) {
+                    discarded.set(bundle); entered.countDown();
+                    try { if(!resume.await(5,java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("TEST rendezvous timeout"); }
+                    catch(InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+                }
+                return bundle;
+            })) {
+                var old=executor.submit(()->registry.reconcile(Map.of("BTCUSDT",slow,"ETHUSDT",eth)));
+                try {
+                    assertThat(entered.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                    if(closeDuringLoad) registry.close();
+                    else registry.reconcile(Map.of("BTCUSDT",fast)); // ETH removed by newer whole-map revision
+                } finally { resume.countDown(); }
+                old.get(5,java.util.concurrent.TimeUnit.SECONDS);
+                try(var btc=registry.acquire("BTCUSDT"); var other=registry.acquire("ETHUSDT")) {
+                    assertThat(btc.bundle().validated()).isEqualTo(!closeDuringLoad);
+                    if(!closeDuringLoad) assertThat(btc.bundle().modelVersion()).isEqualTo("TEST_FAST_MODEL");
+                    assertThat(other.bundle().validated()).isFalse();
+                }
+                assertThat(discarded.get().reason()).isEqualTo("MODEL_CLOSED");
+            } finally { resume.countDown(); executor.shutdownNow(); }
+        }
+    }
+    @Test void springConfigurationBindsPerAssetPathAndReviewedManifestWithoutEnablingExport() {
+        var source=new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(Map.of(
+                "trade-model.asset-card.model-bundles.btcusdt.path",directory.toString(),
+                "trade-model.asset-card.model-bundles.btcusdt.expected-manifest-sha256","a".repeat(64)));
+        var properties=new org.springframework.boot.context.properties.bind.Binder(source)
+                .bind("trade-model.asset-card",org.springframework.boot.context.properties.bind.Bindable.of(AssetCardProperties.class)).get();
+        assertThat(properties.getModelBundles()).containsOnlyKeys("BTCUSDT");
+        assertThat(properties.getModelBundles().get("BTCUSDT").path()).isEqualTo(directory.toAbsolutePath());
+        assertThat(properties.getModelBundles().get("BTCUSDT").expectedManifestSha256()).isEqualTo("a".repeat(64));
+        assertThat(properties.isEnabled()).isFalse(); assertThat(properties.isTrainingExportEnabled()).isFalse();
+    }
+    @Test void publicRegistryNeverAcceptsMissingOrUncheckedBundleMetadata() {
+        try(var registry=new AssetCardModelBundle.Registry()) {
+            var results=registry.reconcile(Map.of("BTCUSDT",new AssetCardModelBundle.Source(directory,null),
+                    "ETHUSDT",new AssetCardModelBundle.Source(directory.resolve("missing"),"0".repeat(64))));
+            assertThat(results.values()).allMatch(result->!result.available());
+            try(var btc=registry.acquire("BTCUSDT"); var eth=registry.acquire("ETHUSDT")) {
+                assertThat(btc.bundle().thresholds()).isNull(); assertThat(eth.bundle().thresholds()).isNull();
+                assertThat(btc.bundle().validatedAssets()).isEmpty(); assertThat(eth.bundle().validatedAssets()).isEmpty();
+            }
+        }
+    }
+    private AssetCardModelBundle.Source source(String name) { return new AssetCardModelBundle.Source(directory.resolve("TEST_ONLY_"+name),"0".repeat(64)); }
+    private static AssetCardModelBundle.Registry registry(java.util.function.Function<AssetCardModelBundle.Source,AssetCardModelBundle> loader) throws Exception {
+        var constructor=AssetCardModelBundle.Registry.class.getDeclaredConstructor(java.util.function.Function.class);
+        constructor.setAccessible(true); return constructor.newInstance(loader); // isolated loader seam, never a public unvalidated install API
+    }
+    private static AssetCardModelBundle testBundle(String symbol,String version) {
+        try {
+            var constructor=AssetCardModelBundle.class.getDeclaredConstructor(Booster.class,Booster.class,
+                    AssetCardBetaCalibration.Parameters.class,AssetCardBetaCalibration.Parameters.class,String.class,String.class,String.class,
+                    AssetCardModelBundle.Thresholds.class,Map.class,Set.class,String.class);
+            constructor.setAccessible(true);
+            var parameters=new AssetCardBetaCalibration.Parameters(1,1,0,1e-7);
+            var thresholds=new AssetCardModelBundle.Thresholds(new AssetCardModelBundle.Tier(.55,.05),new AssetCardModelBundle.Tier(.65,.1),new AssetCardModelBundle.Tier(.75,.2),.01,.5);
+            var bundle=constructor.newInstance(mock(Booster.class),mock(Booster.class),parameters,parameters,"TEST_"+version+"_MODEL","TEST_"+version+"_CAL","TEST_"+version+"_THRESHOLD",thresholds,Map.of(),Set.of(symbol),null);
+            setTestLifecycle(bundle);
+            var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true);
+            var life=bundle.lifecycle(); field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_"+version+"_DATA","TEST_"+version+"_RISK",life.trainedThrough(),life.validUntil(),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
+            return bundle;
+        } catch(Exception failure) { throw new AssertionError(failure); }
+    }
+    private static void expire(AssetCardModelBundle bundle) {
+        try {
+            var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true); var life=bundle.lifecycle();
+            field.set(bundle,new AssetCardModelBundle.Lifecycle(life.dataVersion(),life.riskVersion(),java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1),life.missingPatterns(),life.featureLower(),life.featureUpper(),life.maxFeatureOutlierFraction()));
+        } catch(Exception failure) { throw new AssertionError(failure); }
+    }
     @Test void absentBundleDoesNotInventSamplesMetricsThresholdsOrConfidence() {
         try (var bundle = AssetCardModelBundle.load(directory, "0".repeat(64))) {
             assertThat(bundle.validated()).isFalse();

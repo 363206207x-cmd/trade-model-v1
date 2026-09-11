@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.time.Duration;
+import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 
 @Component
@@ -26,6 +28,11 @@ public class AssetCardProperties {
     private int retainedBarsPerInterval = 1024;
     private String modelBundlePath;
     private String modelBundleSha256 = "";
+    private Map<String,AssetCardModelBundle.Source> modelBundles = Map.of();
+    private int labelMaturityBatchSize = 128;
+    private Duration labelMaturityInterval = Duration.ofSeconds(60);
+    private Path trainingExportDirectory;
+    private boolean trainingExportEnabled;
     private Set<String> canarySymbols = Set.of();
 
     public boolean isEnabled() { return enabled; }
@@ -95,6 +102,22 @@ public class AssetCardProperties {
             throw new IllegalArgumentException("Model bundle requires an exact SHA-256 checksum");
         modelBundleSha256 = checksum;
     }
+    public Map<String,AssetCardModelBundle.Source> getModelBundles() { return modelBundles; }
+    public void setModelBundles(Map<String,AssetCardModelBundle.Source> value) { modelBundles = AssetCardModelBundle.normalizeSources(value); }
+    public int getLabelMaturityBatchSize() { return labelMaturityBatchSize; }
+    public void setLabelMaturityBatchSize(int value) {
+        if(value<1 || value>10_000) throw new IllegalArgumentException("Invalid card label maturity batch size");
+        labelMaturityBatchSize=value;
+    }
+    public Duration getLabelMaturityInterval() { return labelMaturityInterval; }
+    public void setLabelMaturityInterval(Duration value) {
+        if(value==null || value.isNegative() || value.isZero()) throw new IllegalArgumentException("Card label interval must be positive");
+        labelMaturityInterval=value;
+    }
+    public Path getTrainingExportDirectory() { return trainingExportDirectory; }
+    public void setTrainingExportDirectory(Path value) { trainingExportDirectory=value; }
+    public boolean isTrainingExportEnabled() { return trainingExportEnabled; }
+    public void setTrainingExportEnabled(boolean value) { trainingExportEnabled=value; }
     public Set<String> getCanarySymbols() { return canarySymbols; }
     public void setCanarySymbols(Set<String> value) {
         if (value == null) { canarySymbols = Set.of(); return; }
