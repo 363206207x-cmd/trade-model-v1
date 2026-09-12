@@ -1153,9 +1153,18 @@ PR #1300, with continuation baseline
 `f2a3903668d8e8129e18bace3d533b6273ebf8a6`, is the Owner-authorized
 continuation of the same V42 task on
 `codex/v4-1-asset-card-live-signal-closure` in that same repository, not a new
-package. It must retain the verified original-source, merged-source and
-continuation-baseline ancestry. The gate must verify the repository, branch,
-current remote Head, ancestry and every changed path; other PRs, missing
+package. PR #1300 subsequently merged as
+`34b943eece4f19c927b5d96aa50fe17e9025f182`. PR #1302 is the next exact
+Owner-authorized continuation of this same V42 task, repository and business
+branch, retaining synchronization baseline
+`9e0699fad12d9ab87731afb6522a90de74648746` and audited repair Head
+`ef8f0b098e56e15c2bc3c42db040c0360cfc9bed`. It must retain all six identities
+as ancestors: the original audited source, #1295 merge, #1300 baseline,
+#1300 merge, synchronization baseline and audited repair Head. The gate must
+verify both historical merges against their actual PR responses and
+`origin/main`, verify #1302's open status, base branch, repository, business
+branch and current remote Head, and inspect every actual changed path.
+This is not authorization for an arbitrary future PR. Other PRs, missing
 evidence, mismatched identity or out-of-scope changes remain blocked.
 The 64 implementation paths, seven gate paths and their fingerprints are
 unchanged. This continuation registration grants no additional deployment

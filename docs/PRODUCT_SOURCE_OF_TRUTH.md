@@ -58,7 +58,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|58541098dc94af3d60dedec14fc9fe9764df9eb545c6fc360e085995ea2f118d|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|9d7f28a7ae221c9751c86534d92f8bed0c0b02a343864e470b0abce69cb9e672|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
@@ -994,6 +994,16 @@ Owner-authorized continuation in `363206207x-cmd/trade-model-v1`, on the same
 `codex/v4-1-asset-card-live-signal-closure` branch, retaining baseline
 `f2a3903668d8e8129e18bace3d533b6273ebf8a6`. Repository, branch, remote Head,
 source/merge/baseline ancestry and actual changed-path checks remain mandatory.
+PR #1300 subsequently merged as
+`34b943eece4f19c927b5d96aa50fe17e9025f182`. The next exact continuation is
+PR #1302 in the same repository and business branch, with synchronization
+baseline `9e0699fad12d9ab87731afb6522a90de74648746` and audited repair Head
+`ef8f0b098e56e15c2bc3c42db040c0360cfc9bed`. All six source, merge and
+continuation identities must be verified as ancestors of its actual remote
+Head; the two historical merges must also match their PR responses and
+`origin/main`. An open PR #1302 targeting `main`, matching repository and
+branch identities, and exact changed-path validation are required. This does
+not register arbitrary future PRs or replace the original #1295 source.
 The 64 business paths, seven gate paths, fingerprints and original source
 identity remain unchanged. This synchronization grants no new deployment
 authority; subsequent actions retain the separately approved exact-version,
