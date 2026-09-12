@@ -744,22 +744,153 @@ run_outer_scenario() {
   V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/v1-codex-run-next.sh "$@"
 }
 
+# Diagnostic-only capture. The assertions below still consume the complete,
+# unredacted combined output and the actual handoff process exit status.
+handoff_diagnostic_dirs=()
+cleanup_handoff_diagnostics() {
+  local directory cleanup_failed=0
+  for directory in ${handoff_diagnostic_dirs[@]+"${handoff_diagnostic_dirs[@]}"}; do
+    if ! rm -f -- "$directory/stdout" "$directory/stderr" "$directory/capture-status" "$directory/stdout.pipe" "$directory/stderr.pipe"; then
+      cleanup_failed=1
+    elif ! rmdir -- "$directory"; then
+      cleanup_failed=1
+    fi
+  done
+  return "$cleanup_failed"
+}
+trap 'handoff_exit_status=$?; if ! cleanup_handoff_diagnostics; then printf "%s\n" "HANDOFF_DIAGNOSTIC_CLEANUP_FAILED" >&2; fi; exit "$handoff_exit_status"' EXIT
+
+handoff_diagnostic_stream() {
+  local stream="$1" file="$2"
+  printf '%s_BEGIN (redacted; maximum 8192 bytes)\n' "$stream"
+  # Use an allowlist, not a blacklist of possible credentials. Read to EOF;
+  # never introduce another early-closing printf/awk pipeline for diagnostics.
+  LC_ALL=C awk '
+    function emit(value) {
+      if (written + length(value) + 1 <= 8064) {
+        print value; written += length(value) + 1
+      } else truncated=1
+    }
+    {
+      raw += length($0) + 1
+      if (tolower($0) ~ /(token|cookie|password|secret|bearer)/)
+        emit("[REDACTED]")
+      else if ($0 ~ /^(RESOLVED_FROM_STATE|RESOLUTION_STATUS|RESOLUTION_BLOCK_REASON|GENERATED_TASK|REQUEST_CLASS|RESOLVED_PACKAGE|RESOLVED_MODE|RESOLVED_EDIT_PERMISSION|NEXT_PACKAGE_ALLOWED|NEXT_PACKAGE_BLOCK_REASON): [A-Z_0-9]+$/)
+        emit($0)
+      else if ($0 ~ /^awk: cmd\. line:[0-9]+: warning: regexp escape sequence /)
+        emit("awk: regexp escape sequence warning [detail redacted]")
+      else if ($0 ~ /^scripts\/(codex-next-task|v1-state)\.sh: line [0-9]+: printf: write error: Broken pipe$/)
+        emit("shell: printf: write error: Broken pipe")
+      else emit("[REDACTED]")
+    }
+    END { if (truncated || raw > 8192) print "[TRUNCATED]" }
+  ' "$file" || return "$?"
+  printf '%s_END\n' "$stream"
+}
+
+emit_handoff_diagnostic() {
+  local scenario="$1" expected_reason="$2" status="$3" output="$4" directory="$5"
+  local status_pipeline="$6" reason_pipeline="$7" task_pipeline="$8"
+  shift 8
+  local request_package=NOT_SUPPLIED request_class=NOT_EMITTED actual_status=NOT_EMITTED
+  local actual_reason=NOT_EMITTED argument line field value script_head=UNAVAILABLE ci_pr=NOT_AVAILABLE
+  local expect_package=0
+  for argument in "$@"; do
+    if [[ "$expect_package" == 1 ]]; then
+      if [[ "$argument" =~ ^(V4[12]_|FUNDAMENTAL_AI_V4_1_)[A-Z0-9_]+$ && ${#argument} -le 160 \
+        && ! "$argument" =~ TOKEN|COOKIE|PASSWORD|SECRET|BEARER ]]; then
+        request_package="$argument"
+      else request_package=REDACTED; fi
+      expect_package=0
+    elif [[ "$argument" == --request-package ]]; then expect_package=1; fi
+  done
+  while IFS= read -r line; do
+    field="${line%%: *}"; value="${line#*: }"
+    [[ "$value" =~ ^[A-Z][A-Z0-9_]*$ && ${#value} -le 160 \
+      && ! "$value" =~ TOKEN|COOKIE|PASSWORD|SECRET|BEARER ]] || continue
+    case "$field" in
+      REQUEST_CLASS) [[ "$request_class" != NOT_EMITTED ]] || request_class="$value" ;;
+      RESOLUTION_STATUS) [[ "$actual_status" != NOT_EMITTED ]] || actual_status="$value" ;;
+      RESOLUTION_BLOCK_REASON) [[ "$actual_reason" != NOT_EMITTED ]] || actual_reason="$value" ;;
+    esac
+  done <<<"$output"
+  if script_head="$(git rev-parse --short=12 HEAD 2>/dev/null)"; then
+    [[ "$script_head" =~ ^[0-9a-f]{12}$ ]] || script_head=UNAVAILABLE
+  else script_head=UNAVAILABLE; fi
+  if [[ "${GITHUB_REF:-}" =~ ^refs/pull/([0-9]+)/merge$ ]]; then ci_pr="${BASH_REMATCH[1]}"; fi
+  printf 'HANDOFF_DIAGNOSTIC_BEGIN\nSCENARIO=%s\nREQUEST_PACKAGE=%s\nREQUEST_CLASS=%s\nREQUEST_PR=NOT_EMITTED\nCI_PR=%s\nTEST_SCRIPT_HEAD=%s\n' \
+    "$scenario" "$request_package" "$request_class" "$ci_pr" "$script_head"
+  printf 'SUBPROCESS_EXIT=%s\nSTATUS_PIPELINE=%s\nREASON_PIPELINE=%s\nTASK_PIPELINE=%s\n' \
+    "$status" "$status_pipeline" "$reason_pipeline" "$task_pipeline"
+  printf 'EXPECTED_STATUS=BLOCKED\nEXPECTED_REASON=%s\nACTUAL_STATUS=%s\nACTUAL_REASON=%s\n' \
+    "$expected_reason" "$actual_status" "$actual_reason"
+  if [[ -n "$directory" ]]; then
+    printf 'CAPTURE_STATUS='; tr -cd '0-9 \n' <"$directory/capture-status" || return "$?"
+    handoff_diagnostic_stream STDOUT "$directory/stdout" || return "$?"
+    handoff_diagnostic_stream STDERR "$directory/stderr" || return "$?"
+  else
+    printf '%s\n' 'STREAM_CAPTURE=UNAVAILABLE; original combined assertions preserved'
+  fi
+  printf '%s\n' HANDOFF_DIAGNOSTIC_END
+}
+
 assert_handoff_blocked() {
   local scenario="$1"
   local expected_reason="$2"
-  local output status
+  local output status directory="" anomaly=0
+  local -a status_pipeline reason_pipeline task_pipeline
   shift 2
+  if directory="$(mktemp -d "${TMPDIR:-/tmp}/v42-handoff-diagnostic.XXXXXXXX" 2>/dev/null)"; then
+    handoff_diagnostic_dirs+=("$directory")
+    if ! command -v tee >/dev/null 2>&1 \
+      || ! mkfifo "$directory/stdout.pipe" "$directory/stderr.pipe" 2>/dev/null; then
+      directory=""
+    fi
+  else directory=""; fi
   set +e
-  output="$(run_handoff_scenario "$scenario" "$@" 2>&1)"
+  if [[ -n "$directory" ]]; then
+    output="$(
+      tee "$directory/stdout" <"$directory/stdout.pipe" &
+      stdout_capture_pid=$!
+      tee "$directory/stderr" <"$directory/stderr.pipe" &
+      stderr_capture_pid=$!
+      run_handoff_scenario "$scenario" "$@" >"$directory/stdout.pipe" 2>"$directory/stderr.pipe"
+      subprocess_status=$?
+      wait "$stdout_capture_pid"; stdout_capture_status=$?
+      wait "$stderr_capture_pid"; stderr_capture_status=$?
+      printf '%s %s\n' "$stdout_capture_status" "$stderr_capture_status" >"$directory/capture-status"
+      exit "$subprocess_status"
+    )"
+  else
+    output="$(run_handoff_scenario "$scenario" "$@" 2>&1)"
+  fi
   status=$?
   set -e
-  [[ "$status" -ne 0 ]] || fail "handoff scenario must be blocked: $scenario"
-  printf '%s\n' "$output" | grep -Fq "RESOLUTION_STATUS: BLOCKED" \
-    || fail "blocked handoff scenario omitted blocked status: $scenario"
-  printf '%s\n' "$output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason" \
-    || fail "blocked handoff scenario reason mismatch: $scenario"
-  printf '%s\n' "$output" | grep -Fq "GENERATED_TASK: BLOCKED" \
-    || fail "blocked handoff scenario generated a task: $scenario"
+  [[ "$status" -ne 0 ]] || { fail "handoff scenario must be blocked: $scenario"; anomaly=1; }
+  if printf '%s\n' "$output" | grep -Fq "RESOLUTION_STATUS: BLOCKED"; then
+    status_pipeline=("${PIPESTATUS[@]}")
+  else
+    status_pipeline=("${PIPESTATUS[@]}")
+    fail "blocked handoff scenario omitted blocked status: $scenario"; anomaly=1
+  fi
+  if printf '%s\n' "$output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason"; then
+    reason_pipeline=("${PIPESTATUS[@]}")
+  else
+    reason_pipeline=("${PIPESTATUS[@]}")
+    fail "blocked handoff scenario reason mismatch: $scenario"; anomaly=1
+  fi
+  if printf '%s\n' "$output" | grep -Fq "GENERATED_TASK: BLOCKED"; then
+    task_pipeline=("${PIPESTATUS[@]}")
+  else
+    task_pipeline=("${PIPESTATUS[@]}")
+    fail "blocked handoff scenario generated a task: $scenario"; anomaly=1
+  fi
+  if [[ "$anomaly" == 1 ]]; then
+    if ! emit_handoff_diagnostic "$scenario" "$expected_reason" "$status" "$output" "$directory" \
+      "${status_pipeline[*]}" "${reason_pipeline[*]}" "${task_pipeline[*]}" "$@"; then
+      printf '%s\n' HANDOFF_DIAGNOSTIC_RENDER_FAILED >&2
+    fi
+  fi
 }
 
 authorization_review_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
