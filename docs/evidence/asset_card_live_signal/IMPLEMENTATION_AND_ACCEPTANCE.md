@@ -75,6 +75,50 @@ the identity failure. Candidate and merged-main builds must each use a new clean
 isolated checkout and their own generated identity and SHA-256; full Maven,
 packaged-JAR/CI/review and actual Staging evidence remain separate requirements.
 
+### Exact candidate review and bounded recovery correction
+
+Candidate `f993ff613aedd859fdd077781a4b72ab32a0c3d3` was built in a new,
+initially target-free detached worktree, without clean. Its generated Git identity
+matched that clean commit. Full Maven: 5,590 tests, zero failures/errors, 14 skips;
+Python: 49 passed; frontend event/expiry/timezone matrix passed. The standard JAR
+SHA-256 was `eb711dde7bd89ebbd432c696e85bbda2d26686ae1ce48a7d2b9ff45f144dc260`.
+Fifteen loopback WebSocket scenarios loaded production classes extracted from that
+JAR. Fourteen additional native-probe/real isolated credential tests passed. The
+same JAR passed Linux x86_64 Java 17/XGBoost 2.1.4 LONG/SHORT and independent Beta
+interop, maximum error zero; these were temporary fixture models, not production.
+
+Both exact-head quality-gate runs (34688747384 and 34688745793) passed 1,594 tests
+with two explicit opt-in skips; workflow-contract run 34688747462 passed. The real
+Linux writer/ACL class ran all 14 tests without skips in both quality jobs. Local
+full-suite skips were one LinuxKit tmpfs ACL capability case, twelve individually
+controlled legacy P3/P3H/external PostgreSQL cases, and one external CoinGlass
+smoke test. CI did not run the dedicated-Python and retained-rollback-JAR opt-ins;
+those ran locally. No real external database or CoinGlass probe was substituted.
+
+The exact f993ff61 review nevertheless found two P1 issues, so that candidate
+remained Draft and was not merged/deployed. `V42-RECOVERED-RISK-VERSION` exposed a
+same-version read-only risk withdrawal rejected by browser group watermarks.
+`V42-INFERENCE-ADMISSION-LOSS` exposed a closed-bar audit silently lost after a
+transient writer-admission timeout. New regressions first reproduced both failures.
+The correction must retain real CAS versioning on background recovery and zero
+GET writes; a verified newer trade may only withdraw the exact older Spot-source
+DATA claim to UNKNOWN, preserving unrelated evidence and the analysis clock.
+Deferred inference writes preserve immutable point-in-time evidence and the same
+symbol/closed5mAt identity, have at most three total admissions, and never publish
+a retried calculation as an on-time prediction. Exhaustion explicitly stops only
+the card collection under the original ledger; no window/budget is restarted.
+Final post-correction checks and review must be recorded against their own Head.
+The post-review WIP focused suite passed 467 tests, zero failures/errors, one
+local tmpfs ACL skip; Python 49 and the full frontend matrix passed. Product
+Source, task validation, 101 outer-machine cases and workflow-contract passed.
+The new frozen-evidence regression compares all nested values without numeric
+tolerance and preserves exact Instant nanoseconds; it does not require equivalent
+JSON spellings such as `100.0` and `100` to retain different node classes.
+An exhausted write is explicitly UNPERSISTED: its pending payload is in memory,
+not claimed as durable or automatically replayable after restart. The original
+persisted bars and observations are not deleted. No server or new-window action
+was performed for these local regressions.
+
 ## V42 stream recovery and stale-price correction — 2026-09-12
 
 This is the same V42 card-only task, not a new model or algorithm. The business

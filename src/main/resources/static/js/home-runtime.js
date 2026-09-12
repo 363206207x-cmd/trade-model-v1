@@ -859,7 +859,8 @@
                     priceValidUntil: null, priceTradeId: null, priceExpired: true, priceUnavailable: false }));
                 snapshot = assetCardSnapshots.get(symbol);
             }
-            if (!document.hidden && snapshot.priceExpired === true) patchAssetCard(symbol, "PRICE");
+            // Visibility restoration also paints an already accepted recovery when no new GET/frame succeeds.
+            if (!document.hidden) patchAssetCard(symbol, "PRICE");
         });
         scheduleAssetCardExpiry();
     }
@@ -974,6 +975,29 @@
                 return !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === risk[key];
             });
     }
+    function assetCardSpotRecovery(snapshot) {
+        var priceState = assetCardFieldVersions.get(snapshot.symbol + "|PRICE");
+        var observed = assetCardDate(snapshot.latestPriceAt);
+        if (!priceState || !observed || !assetCardPriceIsCurrent(snapshot)
+                || String(snapshot.priceTradeId) !== priceState.tradeId || observed.getTime() !== priceState.observedAt
+                || !assetCardRiskMatches(snapshot) || !Array.isArray(snapshot.risk.items)) return snapshot;
+        var changed = false;
+        var items = snapshot.risk.items.map(function (item) {
+            var at = assetCardDate(item && item.asOf);
+            if (!item || item.type !== "DATA" || item.evidenceValue !== "SPOT_SOURCE_UNAVAILABLE"
+                    || item.unit !== "SOURCE_STATE" || !at || at >= observed) return item;
+            changed = true;
+            // The accepted real trade disproves this older source claim, not the other data/risk evidence.
+            return { type: "DATA", assessmentStatus: "UNKNOWN", level: null, evidenceValue: null,
+                source: null, asOf: null, unit: null, hardInvalidation: false, invalidatesSignal: false,
+                reason: "现货成交已恢复，其他数据证据待重新评估" };
+        });
+        if (!changed) return snapshot;
+        var assessed = items.filter(function (item) { return item && item.assessmentStatus === "ASSESSED"; });
+        var level = assessed.some(function (item) { return item.level === "HIGH"; }) ? "HIGH"
+            : assessed.some(function (item) { return item.level === "MEDIUM"; }) ? "MEDIUM" : null;
+        return Object.assign({}, snapshot, { risk: Object.assign({}, snapshot.risk, { items: items, overallLevel: level }) });
+    }
     function mergeAssetCardPrice(symbol, payload) {
         var tradeId = payload.priceTradeId, observed = assetCardDate(payload.latestPriceAt);
         if ((typeof tradeId !== "string" && !Number.isSafeInteger(tradeId)) || !/^[1-9][0-9]*$/.test(String(tradeId))
@@ -983,10 +1007,11 @@
                 || previous.observedAt && observed.getTime() < previous.observedAt
                 || previous.failureAt && observed.getTime() <= previous.failureAt) return false;
         var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
-        assetCardSnapshots.set(symbol, Object.assign({}, current, {
+        var next = Object.assign({}, current, {
             spotPrice: payload.spotPrice, latestPriceAt: payload.latestPriceAt, priceTradeId: tradeId,
-            priceValidUntil: payload.priceValidUntil, priceExpired: false, priceUnavailable: false }));
+            priceValidUntil: payload.priceValidUntil, priceExpired: false, priceUnavailable: false });
         assetCardFieldVersions.set(symbol + "|PRICE", { tradeId: String(tradeId), observedAt: observed.getTime(), failureAt: previous.failureAt });
+        assetCardSnapshots.set(symbol, assetCardSpotRecovery(next));
         scheduleAssetCardExpiry();
         return true;
     }
@@ -1022,7 +1047,7 @@
             if (clock && (!previousClock || clock >= previousClock)) next.cardAsOf = payload.cardAsOf;
         }
         assetCardFieldVersions.set(identity, version);
-        assetCardSnapshots.set(symbol, next);
+        assetCardSnapshots.set(symbol, assetCardSpotRecovery(next));
         return true;
     }
     function patchAssetCardField(card, field, value, className) {
@@ -1037,6 +1062,10 @@
         if (group === "PRICE") {
             patchAssetCardField(card, "price", assetCardPrice(snapshot));
             card.setAttribute("data-card-price-at", snapshot.latestPriceAt || "");
+            var riskSummary = card.querySelector('[data-live-field="risk"]');
+            var riskItems = card.querySelector('[data-live-field="risk-items"]');
+            if (riskSummary && (riskSummary.textContent !== assetCardRiskLabel(assetCardOverallRisk(snapshot))
+                    || riskItems && riskItems.innerHTML !== assetCardRiskItemsHtml(snapshot))) patchAssetCard(symbol, "RISK");
         }
         if (group === "SIGNAL") {
             var frames = assetCardTimeframes(snapshot);
@@ -1192,7 +1221,7 @@
         safe.risk = assetCardRiskEnvelopeMatches(snapshot, safe) ? snapshot.risk
             : previousRiskStillUsable ? current.risk : assetCardUnknownRisk(safe,
                 sourceUnavailable ? "现货来源不可用；当前风险证据未通过身份校验" : "当前模型不可用，方向风险需重新评估");
-        assetCardSnapshots.set(symbol, safe);
+        assetCardSnapshots.set(symbol, assetCardSpotRecovery(safe));
         if (sourceUnavailable) assetCardFieldVersions.set(symbol + "|PRICE", Object.assign({}, priceState, {
             failureAt: Math.max(priceState.failureAt || 0, failureAt.getTime()) }));
         scheduleAssetCardExpiry();

@@ -43,6 +43,17 @@ public class AssetCardService implements AutoCloseable {
     private final Map<String, AssetCardFeatureService.Observation> minuteReturns = new ConcurrentHashMap<>();
     private record BarIdentity(String symbol, Instant closedAt) {}
     private final Set<BarIdentity> queuedBars = ConcurrentHashMap.newKeySet();
+    private static final class PendingInferenceWrite {
+        private final BarIdentity identity;
+        private final Instant completedAt;
+        private final String encoded;
+        private volatile int attempts = 1;
+        private volatile String status = "PENDING";
+        private PendingInferenceWrite(BarIdentity identity, Instant completedAt, String encoded) {
+            this.identity = identity; this.completedAt = completedAt; this.encoded = encoded;
+        }
+    }
+    private final Map<BarIdentity, PendingInferenceWrite> pendingInferenceWrites = new ConcurrentHashMap<>();
     private final Map<String, Object> symbolLocks = new ConcurrentHashMap<>();
     private final Map<String, Object> inferenceLocks = new ConcurrentHashMap<>();
     private final Set<String> pendingRiskRefreshes = ConcurrentHashMap.newKeySet();
@@ -309,6 +320,7 @@ public class AssetCardService implements AutoCloseable {
 
     private void inferClosedBarLocked(String symbol, Instant closedAt, Instant at) {
         if (!properties.isEnabled() || closedAt == null || closedAt.isAfter(at)) return;
+        if (pendingInferenceWrites.containsKey(new BarIdentity(symbol, closedAt))) return;
         if (!persistenceAllowed()) {
             // This worker is no longer queued. Its immutable bar/evidence remains pending, never a fabricated failed audit.
             queuedBars.remove(new BarIdentity(symbol, closedAt));
@@ -339,7 +351,7 @@ public class AssetCardService implements AutoCloseable {
                 return;
             }
             Instant deadline = closedAt.plusSeconds(15);
-            if (at.isAfter(deadline)) { recordClosedFailure(symbol, closedAt, at, "TIMED_OUT"); return; }
+            if (at.isAfter(deadline)) { retry = recordClosedFailure(symbol, closedAt, at, "TIMED_OUT"); return; }
             Map<String, List<AssetCardFeatureService.Bar>> bars = new LinkedHashMap<>();
             for (String interval : AssetCardFeatureService.INTERVALS) bars.put(interval,
                     market.bars(symbol, interval, at, 24).stream().map(AssetCardService::featureBar).toList());
@@ -363,11 +375,11 @@ public class AssetCardService implements AutoCloseable {
             var frame = featureBuilder.build(raw);
             // Missing/old 5m bars do not produce an inference for an unrelated close.
             if (frame.closed5mAt() == null || !frame.closed5mAt().equals(closedAt)) {
-                recordClosedFailure(symbol, closedAt, at, "CLOSED_BAR_INPUT_MISSING"); return;
+                retry = recordClosedFailure(symbol, closedAt, at, "CLOSED_BAR_INPUT_MISSING"); return;
             }
             var prediction = model.predict(frame);
             Instant completedAt = at.plusNanos(Math.max(0, System.nanoTime() - startedNanos));
-            if (completedAt.isAfter(deadline)) { recordClosedFailure(symbol, closedAt, completedAt, "TIMED_OUT"); return; }
+            if (completedAt.isAfter(deadline)) { retry = recordClosedFailure(symbol, closedAt, completedAt, "TIMED_OUT"); return; }
             synchronized (symbolLock(symbol)) {
                 var previous = signalStates.getOrDefault(symbol, AssetCardSignalService.State.initial(symbol));
                 var state = signals.evaluate(previous, frame, model, prediction, properties.getModelMode(), properties.getCanarySymbols());
@@ -380,7 +392,9 @@ public class AssetCardService implements AutoCloseable {
                         "providerEvidenceMissingReasons", providerSnapshot == null ? List.of("COINGLASS_NOT_YET_OBSERVED") : providerSnapshot.missingReasons());
                 String encoded = json.writeValueAsString(audit);
                 int[] saved = {0};
-                if (!persistCard(symbol, () -> saved[0] = mapper.saveInference(symbol, closedAt, completedAt, encoded))) return;
+                if (!persistCard(symbol, () -> saved[0] = mapper.saveInference(symbol, closedAt, completedAt, encoded))) {
+                    retry = deferInferenceWrite(symbol, closedAt, completedAt, encoded); return;
+                }
                 if (saved[0] != 1) {
                     mapper.selectInference(symbol, closedAt, completedAt).ifPresent(existing -> {
                         try { restoreAudit(symbol, existing.payloadJson(), completedAt, model); }
@@ -399,22 +413,105 @@ public class AssetCardService implements AutoCloseable {
             if (!persistenceAllowed()) return;
             failed(Field.SIGNAL, symbol, "卡片分析暂时不可用");
             log.warn("[asset-card] Closed-bar analysis failed ({})", failure.getClass().getSimpleName());
-            try { recordClosedFailure(symbol, closedAt, at, "FAILED"); }
+            try { retry = recordClosedFailure(symbol, closedAt, at, "FAILED"); }
             catch (RuntimeException writeFailure) { failed(Field.PERSISTENCE, symbol, "闭线失败状态无法持久化"); }
         } finally {
             if (!retry) queuedBars.remove(identity);
         }
     }
 
-    private void recordClosedFailure(String symbol, Instant closedAt, Instant at, String outcome) {
-        if (!persistenceAllowed()) return;
+    private boolean recordClosedFailure(String symbol, Instant closedAt, Instant at, String outcome) {
+        if (!persistenceAllowed()) return false;
+        var deferred = pendingInferenceWrites.get(new BarIdentity(symbol, closedAt));
+        if (deferred != null) return "PENDING".equals(deferred.status);
         failed(Field.SIGNAL, symbol, "TIMED_OUT".equals(outcome) ? "本轮闭线计算超过15秒，等待下一闭线" : "本轮闭线数据或计算未完成");
         try {
             String encoded = json.writeValueAsString(payload("closed5mAt", closedAt,
                     "completedAt", at, "outcome", outcome, "modelMode", properties.getModelMode(),
                     "dataKind", "LIVE_OBSERVED_CARD_OUTCOME"));
-            persistCard(symbol, () -> mapper.saveInference(symbol, closedAt, at, encoded));
+            return !persistCard(symbol, () -> mapper.saveInference(symbol, closedAt, at, encoded))
+                    && deferInferenceWrite(symbol, closedAt, at, encoded);
         } catch (JsonProcessingException invalid) { throw new IllegalStateException("CARD_OUTCOME_SERIALIZATION_FAILED", invalid); }
+    }
+
+    /** Preserve the original point-in-time evidence; retry only its write, never recalculate the boundary. */
+    private boolean deferInferenceWrite(String symbol, Instant closedAt, Instant completedAt, String encoded) {
+        var identity = new BarIdentity(symbol, closedAt);
+        var pending = new PendingInferenceWrite(identity, completedAt, encoded);
+        var existing = pendingInferenceWrites.putIfAbsent(identity, pending);
+        if (existing != null) return "PENDING".equals(existing.status);
+        queuedBars.add(identity);
+        return scheduleInferenceWrite(pending);
+    }
+
+    private boolean scheduleInferenceWrite(PendingInferenceWrite pending) {
+        if (!started || !persistenceAllowed()) {
+            pending.status = "PENDING_COLLECTION_STOPPED"; queuedBars.remove(pending.identity); return false;
+        }
+        if (pending.attempts >= 3) {
+            pending.status = "UNPERSISTED"; queuedBars.remove(pending.identity);
+            failed(Field.PERSISTENCE, pending.identity.symbol(), "闭线审计写入重试耗尽，卡片采集已停止，原始证据保留");
+            log.error("[asset-card] Closed-bar outcome UNPERSISTED symbol={} closed5mAt={} completedAt={} attempts={}",
+                    pending.identity.symbol(), pending.identity.closedAt(), pending.completedAt, pending.attempts);
+            market.stopCollection("INFERENCE_PERSISTENCE_RETRY_EXHAUSTED", Instant.now());
+            return false;
+        }
+        int attempt = pending.attempts + 1;
+        try {
+            inference.schedule(() -> retryInferenceWrite(pending, attempt), 250, TimeUnit.MILLISECONDS);
+            return true;
+        } catch (RejectedExecutionException unavailable) {
+            pending.attempts = 3;
+            return scheduleInferenceWrite(pending);
+        }
+    }
+
+    private void retryInferenceWrite(PendingInferenceWrite pending, int attempt) {
+        synchronized (inferenceLocks.computeIfAbsent(pending.identity.symbol(), key -> new Object())) {
+            if (pendingInferenceWrites.get(pending.identity) != pending || !"PENDING".equals(pending.status)
+                    || pending.attempts != attempt - 1) return; // Duplicate/late callback cannot own another attempt.
+            if (!started || !persistenceAllowed()) {
+                pending.status = "PENDING_COLLECTION_STOPPED"; queuedBars.remove(pending.identity); return;
+            }
+            pending.attempts = attempt;
+            try {
+                boolean[] inserted = {false};
+                boolean accepted = persistCard(pending.identity.symbol(), () -> {
+                    Instant writeAt = Instant.now();
+                    try {
+                        var audit = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(pending.encoded);
+                        String originalOutcome = audit.path("outcome").asText();
+                        if ("COMPLETED".equals(originalOutcome)) {
+                            // Retried writes never claim timely publication: the SQL commit itself can cross the deadline.
+                            audit.put("originalOutcome", originalOutcome);
+                            audit.put("outcome", writeAt.isAfter(pending.identity.closedAt().plusSeconds(15)) ? "TIMED_OUT" : "PERSISTENCE_DELAYED");
+                            audit.put("dataKind", "LIVE_OBSERVED_CARD_OUTCOME");
+                        }
+                        audit.put("persistenceStatus", writeAt.isAfter(pending.identity.closedAt().plusSeconds(15))
+                                ? "AFTER_PUBLICATION_DEADLINE" : "RETRIED_WITHOUT_PUBLICATION");
+                        audit.set("persistenceAttemptAt", json.valueToTree(writeAt));
+                        int saved = mapper.saveInference(pending.identity.symbol(), pending.identity.closedAt(), writeAt, json.writeValueAsString(audit));
+                        if (saved == 1) inserted[0] = true;
+                        // selectInference owns the canonical .999/.000 closed-boundary key; do not reinterpret it here.
+                        else if (saved != 0 || mapper.selectInference(pending.identity.symbol(), pending.identity.closedAt(), Instant.now())
+                                .filter(row -> pending.identity.symbol().equals(row.symbol())
+                                        && row.recordKind() == AssetCardMapper.HistoryKind.INFERENCE).isEmpty())
+                            throw new IllegalStateException("CARD_OUTCOME_WINNER_UNAVAILABLE");
+                    } catch (JsonProcessingException invalid) { throw new IllegalStateException("CARD_OUTCOME_SERIALIZATION_FAILED", invalid); }
+                });
+                if (accepted) {
+                    pending.status = "PERSISTED"; pendingInferenceWrites.remove(pending.identity, pending); queuedBars.remove(pending.identity);
+                    var latest = signalStates.get(pending.identity.symbol());
+                    if (inserted[0] && (latest == null || latest.lastClosed5mAt() == null
+                            || latest.lastClosed5mAt().isBefore(pending.identity.closedAt())))
+                        failed(Field.SIGNAL, pending.identity.symbol(), "本轮闭线审计延迟写入，不作为已完成实时信号");
+                    return;
+                }
+            } catch (RuntimeException failure) {
+                failed(Field.PERSISTENCE, pending.identity.symbol(), "闭线审计重试尚未保存，原始证据保留");
+            }
+            scheduleInferenceWrite(pending);
+        }
     }
 
     static boolean latestIntervalClosed(List<AssetCardFeatureService.Bar> bars, String interval, Instant closedAt) {
@@ -754,6 +851,13 @@ public class AssetCardService implements AutoCloseable {
                 quote == null ? "Binance现货成交数据尚未就绪或已过期" : null, quote == null ? at : priceAt);
         var signal = current.signal();
         var risk = current.risk();
+        // Withdraw an obsolete Spot-source claim in the background CAS path as well as the read-only
+        // projection. A newer real trade does not restore a model result or any other missing evidence.
+        if (quote != null && risk != null && risk.matchesBasis(signal)
+                && Objects.equals(risk.riskVersion(), riskVersion(model))
+                && !quote.observedAt().isAfter(at) && at.isBefore(quote.observedAt().plus(properties.getPriceTtl())))
+            risk = recoveredSpotRisk(risk, quote.observedAt());
+        boolean spotFailureWithdrawn = risk != current.risk();
         if (quote == null && signal != null && signal.direction() != null) {
             var state = signalStates.get(symbol);
             if (state != null) {
@@ -781,7 +885,8 @@ public class AssetCardService implements AutoCloseable {
             catch (RuntimeException denied) { canPersist = false; failed(Field.PERSISTENCE, symbol, "卡片状态保存失败；价格独立更新"); }
         }
         var next = new AssetCardSnapshot(symbol, current.assetName(), price, priceAt, signal, risk, health,
-                sameEffectiveSignal(signal, current.signal()) && sameEffectiveRisk(risk, current.risk()) ? current.cardAsOf() : at, version,
+                sameEffectiveSignal(signal, current.signal()) && (spotFailureWithdrawn || sameEffectiveRisk(risk, current.risk()))
+                        ? current.cardAsOf() : at, version,
                 current.featureVersion(), current.modelVersion(), current.calibrationVersion(),current.thresholdVersion(), quote == null ? null : quote.tradeId());
         if (durableChange && canPersist) {
             try {
