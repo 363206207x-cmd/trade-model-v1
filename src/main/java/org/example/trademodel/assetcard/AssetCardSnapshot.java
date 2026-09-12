@@ -10,7 +10,16 @@ import java.util.Objects;
 public record AssetCardSnapshot(
         String symbol, String assetName, BigDecimal spotPrice, Instant latestPriceAt,
         Signal signal, Risk risk, Health health, Instant cardAsOf, long snapshotVersion,
-        String featureVersion, String modelVersion, String calibrationVersion, String thresholdVersion, Long priceTradeId) {
+        String featureVersion, String modelVersion, String calibrationVersion, String thresholdVersion, Long priceTradeId,
+        Instant priceValidUntil) {
+
+    /** Stored snapshots without an expiry are reprojected using the active price TTL, never receipt time. */
+    public AssetCardSnapshot(String symbol, String assetName, BigDecimal spotPrice, Instant latestPriceAt,
+                             Signal signal, Risk risk, Health health, Instant cardAsOf, long snapshotVersion,
+                             String featureVersion, String modelVersion, String calibrationVersion, String thresholdVersion, Long priceTradeId) {
+        this(symbol, assetName, spotPrice, latestPriceAt, signal, risk, health, cardAsOf, snapshotVersion,
+                featureVersion, modelVersion, calibrationVersion, thresholdVersion, priceTradeId, null);
+    }
 
     /** Historical database snapshots lack a real trade identifier; never manufacture one from the DB version. */
     public AssetCardSnapshot(String symbol, String assetName, BigDecimal spotPrice, Instant latestPriceAt,

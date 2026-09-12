@@ -861,7 +861,8 @@ public class AssetCardService implements AutoCloseable {
                 && current.latestPriceAt() != null && (first || !Objects.equals(current.priceTradeId(), previous.priceTradeId())
                 || !Objects.equals(current.latestPriceAt(), previous.latestPriceAt())))
             sendCardToUser(userId, current, "ASSET_CARD_PRICE", payload("spotPrice", current.spotPrice(),
-                    "latestPriceAt", current.latestPriceAt(), "priceTradeId", current.priceTradeId()), at);
+                    "latestPriceAt", current.latestPriceAt(), "priceTradeId", current.priceTradeId(),
+                    "priceValidUntil", current.priceValidUntil()), at);
         boolean identityChanged = first || !Objects.equals(current.featureVersion(), previous.featureVersion())
                 || !Objects.equals(current.modelVersion(), previous.modelVersion())
                 || !Objects.equals(current.calibrationVersion(), previous.calibrationVersion())
@@ -923,13 +924,20 @@ public class AssetCardService implements AutoCloseable {
         var signal = value.signal();
         var risk = value.risk();
         var health = value.health();
+        Instant priceValidUntil = currentPriceAt == null ? null : currentPriceAt.plus(properties.getPriceTtl());
+        boolean sourceWasLost = health != null && "SOURCE_UNAVAILABLE".equals(health.status());
+        // A late pre-loss trade must not resurrect a revoked price. Recovery needs a new real observation,
+        // not a stored value or a new HTTP/SSE receipt time. Signal/risk remain independently fail closed.
+        boolean recoveryTrade = quote != null && health != null && health.asOf() != null
+                && quote.observedAt().isAfter(health.asOf());
         boolean priceMissing = currentPrice == null || currentPriceAt == null || currentPriceAt.isAfter(now)
-                || Duration.between(currentPriceAt, now).compareTo(properties.getPriceTtl()) > 0;
+                || !now.isBefore(priceValidUntil) || sourceWasLost && !recoveryTrade;
         if (priceMissing) {
             signal = signal.direction() != null ? signal.invalidated() : signal;
             risk = sourceLostRisk(signal, risk, now, model);
             health = new AssetCardSnapshot.Health("SOURCE_UNAVAILABLE", "真实现货成交价格尚未就绪或已过期", now);
-        } else if (health == null || !"MODEL_UNAVAILABLE".equals(health.status()) && !"SOURCE_UNAVAILABLE".equals(health.status())) {
+        } else if (health == null || !"MODEL_UNAVAILABLE".equals(health.status())) {
+            if (sourceWasLost) health = new AssetCardSnapshot.Health("HEALTHY", null, currentPriceAt);
             // Risk, model, storage and recovery faults never become a PRICE source failure.
             String riskFailure = failure(Field.RISK, normalized);
             if (riskFailure != null) risk = AssetCardSnapshot.Risk.unknownFor(signal, riskVersion(model), riskFailure);
@@ -948,7 +956,7 @@ public class AssetCardService implements AutoCloseable {
         }
         return new AssetCardSnapshot(normalized, name, priceMissing ? null : currentPrice, priceMissing ? null : currentPriceAt, signal, risk,
                 health, value.cardAsOf(), value.snapshotVersion(), value.featureVersion(), value.modelVersion(), value.calibrationVersion(),value.thresholdVersion(),
-                priceMissing ? null : priceTradeId);
+                priceMissing ? null : priceTradeId, priceMissing ? null : priceValidUntil);
     }
 
     /** Current model identity is checked at every public read/event; stored private facts are never rewritten. */
@@ -976,7 +984,7 @@ public class AssetCardService implements AutoCloseable {
         }
         return new AssetCardSnapshot(snapshot.symbol(), snapshot.assetName(), snapshot.spotPrice(), snapshot.latestPriceAt(),
                 signal, risk, trusted || sourceLost ? snapshot.health() : new AssetCardSnapshot.Health("MODEL_UNAVAILABLE", "卡片模型、校准或阈值版本不可用", checkedAt),
-                snapshot.cardAsOf(), snapshot.snapshotVersion(), snapshot.featureVersion(), snapshot.modelVersion(), snapshot.calibrationVersion(),snapshot.thresholdVersion(),snapshot.priceTradeId());
+                snapshot.cardAsOf(), snapshot.snapshotVersion(), snapshot.featureVersion(), snapshot.modelVersion(), snapshot.calibrationVersion(),snapshot.thresholdVersion(),snapshot.priceTradeId(), snapshot.priceValidUntil());
     }
 
     private static boolean modelMatches(AssetCardSnapshot snapshot, AssetCardModelBundle model, Instant at) {
@@ -1064,7 +1072,7 @@ public class AssetCardService implements AutoCloseable {
         }
         return new AssetCardSnapshot(value.symbol(), value.assetName(), value.spotPrice(), value.latestPriceAt(), hidden, risk,
                 value.health(), value.cardAsOf(), value.snapshotVersion(), value.featureVersion(), value.modelVersion(),
-                value.calibrationVersion(), value.thresholdVersion(), value.priceTradeId());
+                value.calibrationVersion(), value.thresholdVersion(), value.priceTradeId(), value.priceValidUntil());
     }
 
     /** Rollout cohort only: absent/invalid models stay on the new fail-closed projection, never legacy. */

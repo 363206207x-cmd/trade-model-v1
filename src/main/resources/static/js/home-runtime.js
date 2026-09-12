@@ -304,6 +304,7 @@
     var assetCardSnapshots = new Map();
     var assetCardFieldVersions = new Map();
     var assetCardPriceTimers = new Map();
+    var assetCardExpiryTimer = null;
     var assetCardAbortController = null;
     var assetCardRequestSequence = 0;
     var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
@@ -759,6 +760,7 @@
                 window.clearTimeout(assetCardPriceTimers.get(symbol));
                 assetCardPriceTimers.delete(symbol);
             }
+            scheduleAssetCardExpiry();
         }
         return enabled;
     }
@@ -799,6 +801,8 @@
     function assetCardStatus(snapshot) {
         var signal = snapshot && snapshot.signal || {};
         if (signal.status === "INVALIDATED") return "已失效";
+        if (snapshot && snapshot.priceExpired === true) return "价格过期";
+        if (snapshot && snapshot.priceUnavailable === true) return "价格不可用";
         if (assetCardDirection(snapshot) === "—") return "数据不足";
         var state = String(snapshot && snapshot.health && snapshot.health.status || "").toUpperCase();
         if (["HEALTHY", "OK", "NORMAL", "READY", "UP"].indexOf(state) >= 0) return "";
@@ -806,8 +810,42 @@
     }
     function assetCardPrice(snapshot) {
         var price = snapshot && snapshot.spotPrice;
-        return price != null && Number.isFinite(Number(price)) && Number(price) > 0
+        return price != null && Number.isFinite(Number(price)) && Number(price) > 0 && assetCardPriceIsCurrent(snapshot)
             ? "$" + desktop.priceText(price) : "—";
+    }
+    function assetCardPriceIsCurrent(snapshot) {
+        var observed = assetCardDate(snapshot && snapshot.latestPriceAt);
+        var expires = assetCardDate(snapshot && snapshot.priceValidUntil);
+        var now = Date.now();
+        // The server supplies observation + its configured TTL. Receipt/reconciliation never extends it.
+        return observed && expires && observed.getTime() <= now
+            && expires.getTime() > observed.getTime() && now < expires.getTime();
+    }
+    function scheduleAssetCardExpiry() {
+        if (assetCardExpiryTimer !== null) window.clearTimeout(assetCardExpiryTimer);
+        assetCardExpiryTimer = null;
+        var earliest = Infinity;
+        assetCardSnapshots.forEach(function (snapshot, symbol) {
+            if (!assetCardDisplaySymbols.has(symbol) || homeCardSymbols.indexOf(symbol) < 0 || snapshot.spotPrice == null) return;
+            var expires = assetCardDate(snapshot.priceValidUntil);
+            earliest = Math.min(earliest, expires ? expires.getTime() : Date.now());
+        });
+        if (Number.isFinite(earliest)) assetCardExpiryTimer = window.setTimeout(expireAssetCardPrices, Math.max(0, earliest - Date.now()));
+    }
+    function expireAssetCardPrices() {
+        if (assetCardExpiryTimer !== null) window.clearTimeout(assetCardExpiryTimer);
+        assetCardExpiryTimer = null;
+        assetCardSnapshots.forEach(function (snapshot, symbol) {
+            if (!assetCardDisplaySymbols.has(symbol) || homeCardSymbols.indexOf(symbol) < 0) return;
+            if (snapshot.spotPrice != null && !assetCardPriceIsCurrent(snapshot)) {
+                // Retain the independent trade ordering watermarks. A late replay cannot resurrect this trade.
+                assetCardSnapshots.set(symbol, Object.assign({}, snapshot, { spotPrice: null, latestPriceAt: null,
+                    priceValidUntil: null, priceTradeId: null, priceExpired: true, priceUnavailable: false }));
+                snapshot = assetCardSnapshots.get(symbol);
+            }
+            if (!document.hidden && snapshot.priceExpired === true) patchAssetCard(symbol, "PRICE");
+        });
+        scheduleAssetCardExpiry();
     }
     function assetCardTimeframes(snapshot) {
         var signal = snapshot && snapshot.signal || {};
@@ -924,15 +962,17 @@
     function mergeAssetCardPrice(symbol, payload) {
         var tradeId = payload.priceTradeId, observed = assetCardDate(payload.latestPriceAt);
         if ((typeof tradeId !== "string" && !Number.isSafeInteger(tradeId)) || !/^[1-9][0-9]*$/.test(String(tradeId))
-                || !observed || observed > new Date() || !Number.isFinite(Number(payload.spotPrice)) || Number(payload.spotPrice) <= 0) return false;
+                || !observed || !assetCardPriceIsCurrent(payload) || !Number.isFinite(Number(payload.spotPrice)) || Number(payload.spotPrice) <= 0) return false;
         var previous = assetCardFieldVersions.get(symbol + "|PRICE") || {};
         if (previous.tradeId && BigInt(String(tradeId)) <= BigInt(previous.tradeId)
                 || previous.observedAt && observed.getTime() < previous.observedAt
                 || previous.failureAt && observed.getTime() <= previous.failureAt) return false;
         var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
         assetCardSnapshots.set(symbol, Object.assign({}, current, {
-            spotPrice: payload.spotPrice, latestPriceAt: payload.latestPriceAt, priceTradeId: tradeId }));
+            spotPrice: payload.spotPrice, latestPriceAt: payload.latestPriceAt, priceTradeId: tradeId,
+            priceValidUntil: payload.priceValidUntil, priceExpired: false, priceUnavailable: false }));
         assetCardFieldVersions.set(symbol + "|PRICE", { tradeId: String(tradeId), observedAt: observed.getTime(), failureAt: previous.failureAt });
+        scheduleAssetCardExpiry();
         return true;
     }
     function mergeAssetCardGroup(symbol, version, group, payload) {
@@ -991,7 +1031,7 @@
             patchAssetCardField(card, "four-hour", frames.fourHour);
             card.setAttribute("aria-label", "查看 " + symbol + " 首页资产上下文；" + assetCardDirection(snapshot) + "；置信度 " + assetCardConfidence(snapshot));
         }
-        if (group === "SIGNAL" || group === "HEALTH") {
+        if (group === "SIGNAL" || group === "HEALTH" || group === "PRICE") {
             var status = assetCardStatus(snapshot);
             patchAssetCardField(card, "status", status);
             var statusNode = card.querySelector('[data-live-field="status"]');
@@ -1018,9 +1058,10 @@
             }
         }
         if (group === "SIGNAL" || group === "RISK") {
-            patchAssetCardField(card, "card-time", assetCardClock(snapshot.cardAsOf));
+            var analysisAt = snapshot.signal && snapshot.signal.signalAsOf;
+            patchAssetCardField(card, "card-time", assetCardClock(analysisAt));
             var clock = card.querySelector('[data-live-field="card-time"]');
-            if (clock) { if (snapshot.cardAsOf) clock.setAttribute("datetime", snapshot.cardAsOf); else clock.removeAttribute("datetime"); }
+            if (clock) { if (analysisAt) clock.setAttribute("datetime", analysisAt); else clock.removeAttribute("datetime"); }
         }
     }
     function scheduleAssetCardPrice(symbol) {
@@ -1035,6 +1076,8 @@
         var symbol = String(snapshot.symbol || "").toUpperCase(), version = Number(snapshot.snapshotVersion);
         if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
                 || !Number.isSafeInteger(version) || version < 0) return false;
+        if (snapshot.health && snapshot.health.status === "SOURCE_UNAVAILABLE"
+                && applyReadSafetyDowngrade(snapshot, null, renderFields)) return true;
         if (snapshot.health && snapshot.health.status === "MODEL_UNAVAILABLE"
                 && !currentModelCheck(snapshot.health, assetCardSnapshots.get(symbol))) return false;
         var accepted = false;
@@ -1055,6 +1098,27 @@
         var healthAt = assetCardDate(current && current.health && current.health.asOf);
         return checkedAt && checkedAt <= new Date() && (!signalAt || checkedAt >= signalAt) && (!healthAt || checkedAt >= healthAt);
     }
+    function newerAssetCardSafetyBasis(snapshot, current, symbol, version, checkedAt) {
+        var incoming = snapshot.signal, previous = current.signal;
+        var signalAt = assetCardDate(incoming && incoming.signalAsOf);
+        var previousAt = assetCardDate(previous && previous.signalAsOf);
+        if (version <= (assetCardFieldVersions.get(symbol + "|SIGNAL") || 0)
+                || version < (assetCardFieldVersions.get(symbol + "|RISK") || 0)
+                || !signalAt || signalAt > checkedAt || previousAt && (signalAt < previousAt
+                    || signalAt.getTime() === previousAt.getTime() && incoming.direction !== previous.direction)
+                || incoming.calibratedConfidence != null || incoming.pLong != null || incoming.pShort != null) return false;
+        var directionalFailure = incoming.status === "INVALIDATED"
+            && Object.prototype.hasOwnProperty.call(assetCardDirections, incoming.direction)
+            && ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].every(function (key) {
+                return typeof snapshot[key] === "string" && snapshot[key].trim();
+            });
+        var noModel = incoming.direction == null && ["SHADOW", "UNVALIDATED", "INSUFFICIENT_DATA", "FAILED"].indexOf(incoming.status) >= 0;
+        return (directionalFailure || noModel)
+            && ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].every(function (key) {
+                return Object.prototype.hasOwnProperty.call(snapshot, key)
+                    && (snapshot[key] === null || typeof snapshot[key] === "string" && snapshot[key].trim());
+            }) && assetCardRiskEnvelopeMatches(snapshot, snapshot);
+    }
     function applyReadSafetyDowngrade(snapshot, sequence, renderFields) {
         var status = snapshot && snapshot.health && snapshot.health.status;
         if (["RISK_UNAVAILABLE", "SIGNAL_FAILED", "SIGNAL_AND_RISK_UNAVAILABLE"].indexOf(status) >= 0)
@@ -1072,7 +1136,8 @@
         if (coldSource) current = { symbol: symbol, snapshotVersion: 0 };
         if (sequence != null && sequence !== assetCardRequestSequence || renderFields !== false && document.hidden || homeCardSymbols.indexOf(symbol) < 0
                 || !assetCardDisplaySymbols.has(symbol)
-                || !current || !Number.isSafeInteger(version) || version < 0 || version !== current.snapshotVersion
+                || !current || !Number.isSafeInteger(version) || version < 0
+                || (status === "SOURCE_UNAVAILABLE" ? version < current.snapshotVersion : version !== current.snapshotVersion)
                 || status === "MODEL_UNAVAILABLE" && !currentModelCheck(snapshot.health, current)) return false;
         var modelUnavailable = status === "MODEL_UNAVAILABLE" || snapshot.signal && snapshot.signal.status === "UNVALIDATED";
         var sourceUnavailable = status === "SOURCE_UNAVAILABLE";
@@ -1080,21 +1145,32 @@
         if (sourceUnavailable && (!failureAt || failureAt > new Date())) return false;
         var priceState = assetCardFieldVersions.get(symbol + "|PRICE") || {};
         var clearPrice = sourceUnavailable && (!priceState.observedAt || failureAt.getTime() >= priceState.observedAt);
-        var signal = current.signal && Object.assign({}, current.signal, { calibratedConfidence: null, pLong: null, pShort: null });
+        // HEALTH can have advanced the aggregate version before SIGNAL arrives. Only its own group watermark
+        // and a complete, time-ordered signal/risk identity may claim the newly published analysis version.
+        var newBasis = sourceUnavailable && newerAssetCardSafetyBasis(snapshot, current, symbol, version, failureAt);
+        var signal = newBasis ? Object.assign({}, snapshot.signal)
+            : current.signal && Object.assign({}, current.signal, { calibratedConfidence: null, pLong: null, pShort: null });
         if (!signal && snapshot.signal && snapshot.signal.direction == null
                 && ["INSUFFICIENT_DATA", "UNVALIDATED", "SHADOW"].indexOf(snapshot.signal.status) >= 0) {
             signal = Object.assign({}, snapshot.signal, { calibratedConfidence: null, pLong: null, pShort: null });
         }
         if (modelUnavailable) signal = Object.assign({}, signal, { direction: null, status: "UNVALIDATED",
             calibratedConfidence: null, pLong: null, pShort: null, oneHourState: "数据不足", fourHourTrend: "数据不足" });
-        else if (signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
+        else if (!newBasis && signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
         // A read can fail closed without allocating a version. Directional evidence never crosses a changed basis.
         var safe = Object.assign({}, current, {
+            snapshotVersion: Math.max(version, current.snapshotVersion || 0),
             spotPrice: clearPrice ? null : current.spotPrice, latestPriceAt: clearPrice ? null : current.latestPriceAt,
+            priceTradeId: clearPrice ? null : current.priceTradeId, priceValidUntil: clearPrice ? null : current.priceValidUntil,
+            priceUnavailable: clearPrice || current.priceUnavailable === true, priceExpired: clearPrice ? false : current.priceExpired,
             signal: signal, health: Object.assign({}, snapshot.health) });
-        if (!current.signal) {
+        if (!current.signal || newBasis) {
             ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].forEach(function (key) { safe[key] = snapshot[key] || null; });
             safe.riskVersion = snapshot.riskVersion || snapshot.risk && snapshot.risk.riskVersion || null;
+        }
+        if (newBasis) {
+            var effectiveAt = assetCardDate(snapshot.cardAsOf), previousEffectiveAt = assetCardDate(current.cardAsOf);
+            if (effectiveAt && effectiveAt <= failureAt && (!previousEffectiveAt || effectiveAt >= previousEffectiveAt)) safe.cardAsOf = snapshot.cardAsOf;
         }
         var previousRiskStillUsable = assetCardRiskMatches(safe, current.risk)
             && (!sourceUnavailable || ["HIGH", "MEDIUM"].indexOf(assetCardOverallRisk(safe)) >= 0);
@@ -1104,8 +1180,11 @@
         assetCardSnapshots.set(symbol, safe);
         if (sourceUnavailable) assetCardFieldVersions.set(symbol + "|PRICE", Object.assign({}, priceState, {
             failureAt: Math.max(priceState.failureAt || 0, failureAt.getTime()) }));
+        scheduleAssetCardExpiry();
         ["SIGNAL", "RISK", "HEALTH"].forEach(function (group) {
-            assetCardFieldVersions.set(symbol + "|" + group, version);
+            var prior = assetCardFieldVersions.get(symbol + "|" + group) || 0;
+            if (group === "HEALTH" || !sourceUnavailable || newBasis || version <= prior)
+                assetCardFieldVersions.set(symbol + "|" + group, Math.max(prior, version));
         });
         if (renderFields !== false) {
             if (sourceUnavailable) patchAssetCard(symbol, "PRICE");
@@ -1233,6 +1312,7 @@
             if (!applyReadSafetyDowngrade(asset.cardSignal, null, false)) mergeAssetCardSnapshot(asset.cardSignal, false);
         }
         var snapshot = assetCardSnapshots.get(symbol) || {};
+        var analysisAt = snapshot.signal && snapshot.signal.signalAsOf;
         var direction = assetCardDirection(snapshot), confidence = assetCardConfidence(snapshot);
         var frames = assetCardTimeframes(snapshot), status = assetCardStatus(snapshot);
         var level = assetCardOverallRisk(snapshot), riskItems = assetCardRiskItemsHtml(snapshot);
@@ -1252,8 +1332,8 @@
             + (riskItems ? assetCardRiskAttributes(symbol, true) : ' hidden') + '>' + riskItems + '</div></div>'
             + '<div class="opportunity-context"><span data-live-field="one-hour">' + escapeHtml(frames.oneHour)
             + '</span><span data-live-field="four-hour">' + escapeHtml(frames.fourHour) + '</span>'
-            + '<time class="opportunity-updated" data-live-field="card-time"' + (snapshot.cardAsOf ? ' datetime="' + escapeHtml(snapshot.cardAsOf) + '"' : '') + '>'
-            + escapeHtml(assetCardClock(snapshot.cardAsOf)) + '</time>'
+            + '<time class="opportunity-updated" data-live-field="card-time"' + (analysisAt ? ' datetime="' + escapeHtml(analysisAt) + '"' : '') + '>'
+            + escapeHtml(assetCardClock(analysisAt)) + '</time>'
             + '</div></article>';
     }
     function renderOpportunities(home) {
@@ -2060,6 +2140,7 @@
                 homeStreamConnected = false;
                 return;
             }
+            expireAssetCardPrices();
             loadHome(selectedSymbol);
             connectHomeStream();
             scheduleHomeFallbackPoll();
@@ -2070,6 +2151,8 @@
             if (assetCardAbortController) assetCardAbortController.abort();
             assetCardPriceTimers.forEach(function (timer) { window.clearTimeout(timer); });
             assetCardPriceTimers.clear();
+            if (assetCardExpiryTimer !== null) window.clearTimeout(assetCardExpiryTimer);
+            assetCardExpiryTimer = null;
         });
     }
 

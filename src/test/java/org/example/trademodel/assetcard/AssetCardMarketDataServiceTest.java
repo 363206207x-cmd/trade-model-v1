@@ -70,6 +70,8 @@ class AssetCardMarketDataServiceTest {
         service.acceptMessage(trade("btcusdt@trade", "BTCUSDT", 1, "100", NOW), NOW.plusSeconds(1));
         assertThat(service.quote("BTCUSDT", NOW)).isEmpty();
         assertThat(service.quote("BTCUSDT", NOW.plusSeconds(2))).isPresent();
+        assertThat(service.quote("BTCUSDT", NOW.plus(properties.getPriceTtl()).minusNanos(1))).isPresent();
+        assertThat(service.quote("BTCUSDT", NOW.plus(properties.getPriceTtl()))).isEmpty();
         assertThat(service.quote("BTCUSDT", NOW.plus(properties.getPriceTtl()).plusSeconds(1))).isEmpty();
     }
 
@@ -744,5 +746,464 @@ class AssetCardMarketDataServiceTest {
         window.setMinimumFreeBytes(1);
         when(mapper.storageUsage()).thenReturn(new AssetCardMapper.StorageUsage(0,0,0,100,100,true));
         return window;
+    }
+
+    @Test void loopbackExpiredCheckAbortsExplicitlyAndRecoversWithoutResettingAllowance() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server);
+            service.ensureConnected();
+            var first = server.next();
+            await(() -> currentSocket() != null);
+            first.text(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            Object lease = org.springframework.test.util.ReflectionTestUtils.getField(service, "collectionLease");
+            org.springframework.test.util.ReflectionTestUtils.setField(lease, "checkedAt", Instant.now().minusSeconds(20));
+            first.text(trade("btcusdt@aggTrade", "BTCUSDT", 11, "101", Instant.now().minusMillis(5)));
+            await(() -> currentSocket() == null);
+            assertThat(service.quote("BTCUSDT", Instant.now())).isEmpty();
+            reconnectWithinExistingWindow();
+            var second = server.next();
+            await(() -> currentSocket() != null);
+            second.text(trade("btcusdt@aggTrade", "BTCUSDT", 12, "102", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).map(q -> q.tradeId() == 12).orElse(false));
+            assertThat(ledger().path("connections").asLong()).isEqualTo(2);
+            assertThat(ledger().path("state").asText()).isEqualTo("OPEN");
+        }
+    }
+
+    @Test void loopbackSilentConnectionRetiresButPingAndOtherAssetTrafficKeepItAlive() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server);
+            service.ensureConnected(); var first = server.next();
+            await(() -> currentSocket() != null);
+            var old = currentSocket();
+            // Connection-wide liveness is independent of whether ETH has traded.
+            first.text(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            first.frame(9, new byte[]{42});
+            await(() -> first.pongs.get() == 1);
+            service.ensureConnected();
+            assertThat(currentSocket()).isSameAs(old);
+            assertThat(service.quote("ETHUSDT", Instant.now())).isEmpty();
+            org.springframework.test.util.ReflectionTestUtils.setField(service, "lastFrameAt", Instant.now().minusSeconds(121));
+            service.ensureConnected();
+            await(() -> currentSocket() == null);
+            reconnectWithinExistingWindow();
+            server.next(); await(() -> currentSocket() != null);
+            assertThat(currentSocket()).isNotSameAs(old);
+            assertThat(first.pongs.get()).isEqualTo(1); // Java17 automatic Pong, no duplicate application heartbeat.
+        }
+    }
+
+    @Test void loopbackRetiredHandshakeCannotInstallAfterWriterRecovery() throws Exception {
+        try (var server = new LoopbackSpotServer(101, true)) {
+            configureLoopback(server);
+            service.ensureConnected(); var delayed = server.next();
+            service.setWriterReadiness(() -> false); service.ensureConnected();
+            service.setWriterReadiness(() -> true); service.ensureConnected();
+            var replacement = server.next();
+            await(() -> currentSocket() != null);
+            var current = currentSocket();
+            delayed.releaseHandshake.countDown();
+            replacement.text(trade("btcusdt@aggTrade", "BTCUSDT", 2, "102", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            assertThat(currentSocket()).isSameAs(current);
+            assertThat(ledger().path("connections").asLong()).isEqualTo(2);
+        }
+    }
+
+    @Test void loopbackMalformedAndUnsubscribedFramesCannotRenewMarketLiveness() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server); service.ensureConnected(); var peer = server.next();
+            await(() -> currentSocket() != null);
+            Instant expired = Instant.now().minusSeconds(121);
+            org.springframework.test.util.ReflectionTestUtils.setField(service, "lastMarketFrameAt", expired);
+            for (String invalid : List.of("not-json", "{\"stream\":\"btcusdt@kline_5m\",\"data\":{\"e\":\"kline\",\"s\":\"BTCUSDT\"}}",
+                    trade("solusdt@aggTrade", "SOLUSDT", 1, "100", Instant.now().minusMillis(5)))) {
+                int priorPongs = peer.pongs.get(); peer.text(invalid); peer.frame(9, new byte[]{7});
+                await(() -> peer.pongs.get() > priorPongs); // ordered text delivery completed through the real listener.
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(service, "lastMarketFrameAt")).isEqualTo(expired);
+            }
+            service.ensureConnected();
+            assertThat(currentSocket()).isNull();
+            assertThat(service.runtimeMetrics().reconnects()).isEqualTo(1);
+            assertThat(service.quote("SOLUSDT", Instant.now())).isEmpty();
+            verify(mapper, never()).upsertClosedBar(any());
+        }
+    }
+
+    @Test void loopbackOpenKlineRenewsMarketLivenessWithoutBarPersistenceOrInference() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server); service.ensureConnected(); var peer = server.next();
+            await(() -> currentSocket() != null); var opened = currentSocket();
+            List<AssetCardMarketDataService.MarketUpdate> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+            service.addListener(events::add);
+            Instant expired = Instant.now().minusSeconds(121);
+            org.springframework.test.util.ReflectionTestUtils.setField(service, "lastMarketFrameAt", expired);
+            var frame = new ObjectMapper().readTree(kline(false));
+            ((com.fasterxml.jackson.databind.node.ObjectNode)frame.path("data")).put("E", Instant.now().toEpochMilli());
+            peer.text(frame.toString()); peer.frame(9, new byte[]{8});
+            await(() -> peer.pongs.get() == 1);
+            assertThat((Instant)org.springframework.test.util.ReflectionTestUtils.getField(service, "lastMarketFrameAt")).isAfter(expired);
+            service.ensureConnected();
+            assertThat(currentSocket()).isSameAs(opened);
+            assertThat(events).isEmpty();
+            assertThat(service.runtimeMetrics().barQueueDepth()).isZero();
+            verify(mapper, never()).upsertClosedBar(any());
+        }
+    }
+
+    @Test void loopbackHandshakeFailureThenAbnormalCloseRecoverWithBoundedAttempts() throws Exception {
+        try (var server = new LoopbackSpotServer(503, false)) {
+            configureLoopback(server);
+            service.ensureConnected(); server.next();
+            await(() -> service.runtimeMetrics().reconnects() == 1);
+            assertThat(currentSocket()).isNull();
+            reconnectWithinExistingWindow(); var second = server.next();
+            await(() -> currentSocket() != null);
+            second.socket.close();
+            await(() -> currentSocket() == null);
+            reconnectWithinExistingWindow(); var third = server.next();
+            await(() -> currentSocket() != null);
+            third.text(trade("btcusdt@aggTrade", "BTCUSDT", 5, "105", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            assertThat(ledger().path("connections").asLong()).isEqualTo(3);
+            assertThat(service.runtimeMetrics().reconnects()).isEqualTo(2);
+        }
+    }
+
+    @Test void loopbackNormalCloseRejoinsDepthAndRejectsLateOldFrames() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server); service.ensureConnected(); var first = server.next();
+            await(() -> currentSocket() != null);
+            Instant at = Instant.now().minusMillis(5);
+            first.text(depth(10, 12, at, "[]", "[]"));
+            await(() -> service.bufferedDepthEventCount("BTCUSDT") == 1);
+            service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(11), Instant.now());
+            assertThat(service.book("BTCUSDT", Instant.now())).isPresent();
+            first.frame(8, new byte[]{3, (byte)232});
+            await(() -> currentSocket() == null);
+            assertThat(service.book("BTCUSDT", Instant.now())).isEmpty();
+            reconnectWithinExistingWindow(); var second = server.next();
+            await(() -> currentSocket() != null);
+            second.text(depth(30, 32, Instant.now().minusMillis(5), "[]", "[]"));
+            await(() -> service.bufferedDepthEventCount("BTCUSDT") == 1);
+            service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(11), Instant.now());
+            assertThat(service.book("BTCUSDT", Instant.now())).isEmpty();
+            service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(31), Instant.now());
+            assertThat(service.book("BTCUSDT", Instant.now()).orElseThrow().sequence()).isEqualTo(32);
+        }
+    }
+
+    @Test void loopbackTerminalBudgetAndExpiryNeverReconnectOrRefreshPrice() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server); properties.getCollectionWindow().setMaximumConnectionAttempts(1);
+            service.ensureConnected(); var first = server.next(); await(() -> currentSocket() != null);
+            first.text(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            first.socket.close(); await(() -> currentSocket() == null);
+            reconnectWithinExistingWindow();
+            assertThat(service.collectionStatus()).isEqualTo("WS_CONNECTION_BUDGET_EXHAUSTED");
+            for (int i = 0; i < 5; i++) service.ensureConnected();
+            assertThat(server.connections.get()).isEqualTo(1);
+            assertThat(service.quote("BTCUSDT", Instant.now())).isEmpty();
+            assertThat(ledger().path("state").asText()).isEqualTo("STOPPED");
+        }
+    }
+
+    @Test void loopbackAbsoluteDeadlineStopsSocketWithoutExtendingTheWindow() throws Exception {
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server);
+            properties.getCollectionWindow().setEndsAt(Instant.now().plusSeconds(2));
+            service.ensureConnected(); server.next(); await(() -> currentSocket() != null);
+            await(() -> !Instant.now().isBefore(properties.getCollectionWindow().getEndsAt()));
+            service.enforceCollectionWindow();
+            assertThat(currentSocket()).isNull();
+            assertThat(service.collectionStatus()).isEqualTo("WINDOW_EXPIRED");
+            for (int i = 0; i < 5; i++) service.ensureConnected();
+            assertThat(server.connections.get()).isEqualTo(1);
+            assertThat(ledger().path("state").asText()).isEqualTo("STOPPED");
+            assertThat(ledger().path("reason").asText()).isEqualTo("WINDOW_EXPIRED");
+        }
+    }
+
+    @Test void loopbackOnlyOneHandshakeMayBePendingAndOldQueuedObservationsCannotReturn() throws Exception {
+        try (var server = new LoopbackSpotServer(101, true)) {
+            configureLoopback(server); service.ensureConnected(); var first = server.next();
+            for (int i = 0; i < 12; i++) service.ensureConnected();
+            assertThat(server.connections.get()).isEqualTo(1);
+            first.releaseHandshake.countDown(); await(() -> currentSocket() != null);
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            var release = new java.util.concurrent.CountDownLatch(1);
+            var executors = (java.util.concurrent.ThreadPoolExecutor[])org.springframework.test.util.ReflectionTestUtils.getField(service, "tradeFrames");
+            executors[Math.floorMod("BTCUSDT".hashCode(), executors.length)].execute(() -> {
+                entered.countDown(); try { release.await(6, java.util.concurrent.TimeUnit.SECONDS); }
+                catch (InterruptedException stop) { Thread.currentThread().interrupt(); }
+            });
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            List<Long> observed = new java.util.concurrent.CopyOnWriteArrayList<>();
+            service.addTradeListener(value -> observed.add(value.tradeId()));
+            try {
+                first.text(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", Instant.now().minusMillis(5)));
+                await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+                first.socket.close(); await(() -> currentSocket() == null);
+                reconnectWithinExistingWindow(); var second = server.next(); await(() -> currentSocket() != null);
+                second.text(trade("btcusdt@aggTrade", "BTCUSDT", 11, "101", Instant.now().minusMillis(5)));
+                await(() -> service.quote("BTCUSDT", Instant.now()).map(q -> q.tradeId() == 11).orElse(false));
+            } finally { release.countDown(); }
+            assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+            assertThat(observed).containsExactly(11L);
+        }
+    }
+
+    @Test void depthEpochMustBeRecheckedInsideTheBookMutationLock() throws Exception {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 1L);
+        synchronized (service) {
+            org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "enqueueMessage",
+                    depth(90, 92, NOW, "[]", "[]"), NOW, 1L);
+            await(() -> Thread.getAllStackTraces().entrySet().stream().anyMatch(entry ->
+                    entry.getKey().getName().startsWith("asset-card-spot-depth-")
+                            && entry.getKey().getState() == Thread.State.BLOCKED
+                            && java.util.Arrays.stream(entry.getValue()).anyMatch(frame -> frame.getMethodName().equals("acceptDiffDepth"))));
+            // The old worker has passed process()'s first epoch check, but cannot yet own the book lock.
+            org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L);
+            service.acceptMessage(depth(30, 32, NOW, "[]", "[]"), NOW);
+            service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(31), NOW);
+            assertThat(service.book("BTCUSDT", NOW).orElseThrow().sequence()).isEqualTo(32);
+        }
+        assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+        assertThat(service.book("BTCUSDT", NOW).orElseThrow().sequence()).isEqualTo(32);
+    }
+
+    @Test void retiredBarIoCannotPublishAnOldEpochOrHoldTheGlobalLifecycleLock() throws Exception {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 1L);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        List<AssetCardMarketDataService.MarketUpdate> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        service.addListener(events::add);
+        when(mapper.upsertClosedBar(any())).thenAnswer(call -> {
+            assertThat(Thread.holdsLock(service)).isFalse();
+            entered.countDown(); release.await(3, java.util.concurrent.TimeUnit.SECONDS); return 1;
+        });
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "enqueueMessage", kline(true), NOW, 1L);
+        assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        synchronized (service) { org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L); }
+        release.countDown(); assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+        verify(mapper).upsertClosedBar(any()); // Started immutable historical IO is retained, not rolled back or re-timestamped.
+        assertThat(events).isEmpty();
+        var cache = (java.util.Map<?, ?>)org.springframework.test.util.ReflectionTestUtils.getField(service, "closedBars");
+        assertThat((java.util.Map<?, ?>)cache.get("BTCUSDT|5m")).isEmpty();
+    }
+
+    @Test void oldObservationFailureCannotInvalidateNewEpochHealth() throws Exception {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 1L);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        List<AssetCardMarketDataService.MarketUpdate> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        service.addListener(events::add);
+        service.addTradeListener(value -> {
+            entered.countDown(); try { release.await(3, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException stop) { Thread.currentThread().interrupt(); }
+            throw new IllegalStateException("LOCAL_TEST_FAILURE_NOT_FOR_LOGS");
+        });
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "enqueueMessage",
+                trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", NOW), NOW, 1L);
+        assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        synchronized (service) { org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L); }
+        release.countDown(); assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+        assertThat(events).extracting(AssetCardMarketDataService.MarketUpdate::type).containsExactly("PRICE");
+    }
+
+    @Test void successfulHandshakeFutureBeforeOnOpenRetainsSingleFlightAndInstallsTheSocket() throws Exception {
+        configureLoopback(null);
+        var client = mock(java.net.http.HttpClient.class);
+        var builder = mock(java.net.http.WebSocket.Builder.class);
+        var opening = new java.util.concurrent.CompletableFuture<java.net.http.WebSocket>();
+        var listener = new java.util.concurrent.atomic.AtomicReference<java.net.http.WebSocket.Listener>();
+        when(client.newWebSocketBuilder()).thenReturn(builder);
+        when(builder.connectTimeout(any())).thenReturn(builder);
+        when(builder.buildAsync(any(), any())).thenAnswer(call -> { listener.set(call.getArgument(1)); return opening; });
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "http", client);
+        service.ensureConnected();
+        var opened = mock(java.net.http.WebSocket.class);
+        // Java17 may complete buildAsync before its separately scheduled onOpen callback runs.
+        opening.complete(opened);
+        assertThat(((java.util.concurrent.atomic.AtomicBoolean)org.springframework.test.util.ReflectionTestUtils.getField(service, "connecting")).get()).isTrue();
+        service.ensureConnected();
+        verify(builder, times(1)).buildAsync(any(), any());
+        listener.get().onOpen(opened);
+        assertThat(currentSocket()).isSameAs(opened);
+        assertThat(((java.util.concurrent.atomic.AtomicBoolean)org.springframework.test.util.ReflectionTestUtils.getField(service, "connecting")).get()).isFalse();
+        verify(opened).request(1);
+        verify(opened, never()).abort();
+    }
+
+    private void configureLoopback(LoopbackSpotServer server) throws Exception {
+        windowDirectory = windowDirectory.toRealPath();
+        java.nio.file.Files.setPosixFilePermissions(windowDirectory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        Instant now = Instant.now(); var window = properties.getCollectionWindow();
+        window.setId("loopback-only"); window.setStartsAt(now.minusSeconds(1)); window.setEndsAt(now.plusSeconds(90));
+        window.setStateDirectory(windowDirectory); window.setSymbols(java.util.Set.of("BTCUSDT", "ETHUSDT"));
+        window.setSharedIpWeightAllowancePerMinute(1000); window.setSharedIpWeightLimitPerMinute(6000);
+        window.setSharedIpHeadroomConfirmedAt(now.minusSeconds(1)); window.setMinimumFreeBytes(1);
+        when(mapper.storageUsage()).thenReturn(new AssetCardMapper.StorageUsage(0, 0, 0, 100, 100, true));
+        // Test-only loopback injection. The production Binance-only endpoint validator is not weakened.
+        if (server != null) org.springframework.test.util.ReflectionTestUtils.setField(properties, "spotStreamBaseUri", server.uri());
+        properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+        service.reconcileSubscriptions(List.of("BTCUSDT", "ETHUSDT"));
+    }
+
+    private java.net.http.WebSocket currentSocket() {
+        return (java.net.http.WebSocket)org.springframework.test.util.ReflectionTestUtils.getField(service, "socket");
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode ledger() throws Exception {
+        return new ObjectMapper().readTree(java.nio.file.Files.readAllBytes(windowDirectory.resolve("loopback-only.json")));
+    }
+
+    private void reconnectWithinExistingWindow() throws Exception {
+        Instant after = service.runtimeMetrics().reconnectAfter();
+        await(() -> !Instant.now().isBefore(after));
+        service.ensureConnected();
+    }
+
+    private static void await(java.util.function.BooleanSupplier condition) throws Exception {
+        long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(6);
+        while (!condition.getAsBoolean() && System.nanoTime() < until) Thread.sleep(10);
+        assertThat(condition.getAsBoolean()).as("bounded loopback transport condition").isTrue();
+    }
+
+    /** Test-classpath only: rerun real loopback scenarios against classes extracted from the candidate standard JAR. */
+    public static void main(String[] args) throws Exception {
+        if (args.length != 2) throw new IllegalArgumentException("Expected extracted BOOT-INF/classes and candidate JAR");
+        var classes = java.nio.file.Path.of(args[0]).toRealPath();
+        var jar = java.nio.file.Path.of(args[1]).toRealPath();
+        assertThat(classes.getFileName().toString()).isEqualTo("classes");
+        assertThat(classes.getParent().getFileName().toString()).as("Not target/classes").isEqualTo("BOOT-INF");
+        try (var archive = new java.util.jar.JarFile(jar.toFile())) {
+            for (Class<?> type : List.of(AssetCardMarketDataService.class, AssetCardService.class, AssetCardSnapshot.class)) {
+                assertThat(java.nio.file.Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath())
+                        .as("Runtime class must originate in the extracted standard JAR").isEqualTo(classes);
+                String relative = type.getName().replace('.', '/') + ".class";
+                var entry = archive.getJarEntry("BOOT-INF/classes/" + relative);
+                assertThat(entry).isNotNull();
+                byte[] packaged;
+                try (var in = archive.getInputStream(entry)) { packaged = in.readAllBytes(); }
+                assertThat(java.nio.file.Files.readAllBytes(classes.resolve(relative))).isEqualTo(packaged);
+                System.out.println("STANDARD_JAR_CLASS=" + type.getName() + " SHA256="
+                        + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(packaged)));
+            }
+        }
+        var digest = java.security.MessageDigest.getInstance("SHA-256");
+        try (var in = new java.security.DigestInputStream(java.nio.file.Files.newInputStream(jar), digest)) {
+            in.transferTo(java.io.OutputStream.nullOutputStream());
+        }
+        System.out.println("STANDARD_JAR_SHA256=" + java.util.HexFormat.of().formatHex(digest.digest()));
+        for (String scenario : List.of(
+                "loopbackExpiredCheckAbortsExplicitlyAndRecoversWithoutResettingAllowance",
+                "loopbackSilentConnectionRetiresButPingAndOtherAssetTrafficKeepItAlive",
+                "loopbackMalformedAndUnsubscribedFramesCannotRenewMarketLiveness",
+                "loopbackOpenKlineRenewsMarketLivenessWithoutBarPersistenceOrInference",
+                "loopbackRetiredHandshakeCannotInstallAfterWriterRecovery",
+                "loopbackHandshakeFailureThenAbnormalCloseRecoverWithBoundedAttempts",
+                "loopbackNormalCloseRejoinsDepthAndRejectsLateOldFrames",
+                "loopbackTerminalBudgetAndExpiryNeverReconnectOrRefreshPrice",
+                "loopbackAbsoluteDeadlineStopsSocketWithoutExtendingTheWindow",
+                "loopbackOnlyOneHandshakeMayBePendingAndOldQueuedObservationsCannotReturn",
+                "depthEpochMustBeRecheckedInsideTheBookMutationLock",
+                "retiredBarIoCannotPublishAnOldEpochOrHoldTheGlobalLifecycleLock",
+                "oldObservationFailureCannotInvalidateNewEpochHealth",
+                "successfulHandshakeFutureBeforeOnOpenRetainsSingleFlightAndInstallsTheSocket")) {
+            var fixture = new AssetCardMarketDataServiceTest();
+            var temporary = java.nio.file.Files.createTempDirectory("asset-card-standard-jar-loopback-").toRealPath();
+            fixture.windowDirectory = temporary;
+            try {
+                fixture.explicitFixtureWriterReadiness();
+                AssetCardMarketDataServiceTest.class.getDeclaredMethod(scenario).invoke(fixture);
+                System.out.println("STANDARD_JAR_SCENARIO=" + scenario + " RESULT=PASS");
+            } finally {
+                try { fixture.releaseResources(); }
+                finally {
+                    // Only this freshly-created test fixture is removed; no existing ledger or external data is touched.
+                    try (var files = java.nio.file.Files.walk(temporary)) {
+                        for (var file : files.sorted(java.util.Comparator.reverseOrder()).toList()) java.nio.file.Files.deleteIfExists(file);
+                    }
+                }
+            }
+        }
+        System.out.println("STANDARD_JAR_STREAM_RECOVERY=PASS\nREAL_STAGING_ACCEPTANCE=NOT_EXECUTED");
+    }
+
+    /** Real RFC6455 loopback transport; never resolves or contacts a public Provider. */
+    private static final class LoopbackSpotServer implements AutoCloseable {
+        private final java.net.ServerSocket server;
+        private final java.util.concurrent.BlockingQueue<Peer> accepted = new java.util.concurrent.LinkedBlockingQueue<>();
+        private final List<Peer> peers = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final java.util.concurrent.atomic.AtomicInteger connections = new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+            Thread thread = new Thread(r, "card-loopback-test"); thread.setDaemon(true); return thread;
+        });
+        LoopbackSpotServer(int firstStatus, boolean holdFirst) throws Exception {
+            server = new java.net.ServerSocket(0, 8, java.net.InetAddress.getLoopbackAddress());
+            workers.execute(() -> {
+                while (!server.isClosed()) try {
+                    var socket = server.accept(); int count = connections.incrementAndGet();
+                    var peer = new Peer(socket, count == 1 ? firstStatus : 101, count == 1 && holdFirst);
+                    peers.add(peer); workers.execute(() -> peer.run(accepted));
+                } catch (java.io.IOException closed) { if (!server.isClosed()) throw new IllegalStateException(closed); }
+            });
+        }
+        java.net.URI uri() { return java.net.URI.create("ws://127.0.0.1:" + server.getLocalPort() + "/stream"); }
+        Peer next() throws Exception { Peer value = accepted.poll(4, java.util.concurrent.TimeUnit.SECONDS); assertThat(value).isNotNull(); return value; }
+        @Override public void close() throws Exception {
+            server.close(); for (Peer peer : peers) { peer.releaseHandshake.countDown(); peer.socket.close(); }
+            workers.shutdownNow(); assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+        private static final class Peer {
+            private final java.net.Socket socket;
+            private final int status;
+            private final java.util.concurrent.CountDownLatch releaseHandshake;
+            private final java.util.concurrent.atomic.AtomicInteger pongs = new java.util.concurrent.atomic.AtomicInteger();
+            Peer(java.net.Socket socket, int status, boolean hold) { this.socket = socket; this.status = status; releaseHandshake = new java.util.concurrent.CountDownLatch(hold ? 1 : 0); }
+            void run(java.util.concurrent.BlockingQueue<Peer> accepted) {
+                try {
+                    var in = socket.getInputStream(); var header = new java.io.ByteArrayOutputStream();
+                    while (header.size() < 8192) {
+                        int value = in.read(); if (value < 0) return; header.write(value);
+                        if (header.toString(java.nio.charset.StandardCharsets.US_ASCII).endsWith("\r\n\r\n")) break;
+                    }
+                    String request = header.toString(java.nio.charset.StandardCharsets.US_ASCII);
+                    String key = request.lines().filter(line -> line.toLowerCase(java.util.Locale.ROOT).startsWith("sec-websocket-key:"))
+                            .map(line -> line.substring(line.indexOf(':') + 1).trim()).findFirst().orElseThrow();
+                    accepted.add(this); releaseHandshake.await(6, java.util.concurrent.TimeUnit.SECONDS);
+                    if (status != 101) {
+                        socket.getOutputStream().write(("HTTP/1.1 " + status + " Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                        socket.close(); return;
+                    }
+                    String response = java.util.Base64.getEncoder().encodeToString(java.security.MessageDigest.getInstance("SHA-1")
+                            .digest((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+                    socket.getOutputStream().write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + response + "\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                    while (!socket.isClosed()) {
+                        int first = in.read(); if (first < 0) break; int length = in.read(); if (length < 0) break;
+                        boolean masked = (length & 128) != 0; int size = length & 127;
+                        if (size == 126) size = (in.read() << 8) | in.read();
+                        if (size > 4096 || size == 127) throw new java.io.IOException("bounded fixture frame required");
+                        byte[] mask = masked ? in.readNBytes(4) : new byte[0]; byte[] payload = in.readNBytes(size);
+                        if (mask.length == 4) for (int i = 0; i < payload.length; i++) payload[i] ^= mask[i % 4];
+                        if ((first & 15) == 10) pongs.incrementAndGet();
+                        if ((first & 15) == 8) break;
+                    }
+                } catch (Exception expectedClosedPeer) { /* Test assertions inspect observable recovery, not a mocked response. */ }
+            }
+            void text(String value) throws Exception { frame(1, value.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+            synchronized void frame(int opcode, byte[] value) throws Exception {
+                var out = socket.getOutputStream(); out.write(128 | opcode);
+                if (value.length < 126) out.write(value.length); else { out.write(126); out.write(value.length >>> 8); out.write(value.length & 255); }
+                out.write(value); out.flush();
+            }
+        }
     }
 }

@@ -1235,6 +1235,79 @@ class AssetCardServiceTest {
     }
 
     @Test
+    void priceExpiryUsesTheConfiguredTradeClockInReadsAndScopedEvents() {
+        for (long ttlSeconds : new long[]{3, 10}) try (var fixture = new RuntimeFixture()) {
+            Instant at = Instant.parse("2026-09-12T08:00:00Z");
+            fixture.json.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            fixture.properties.setPriceTtl(java.time.Duration.ofSeconds(ttlSeconds));
+            fixture.properties.setOwnerPreviewUserIds(Set.of(7L));
+            fixture.seed(AssetCardSnapshot.Signal.unavailable("SHADOW", at.minusSeconds(60)), at);
+            when(fixture.market.quote(eq("BTCUSDT"), any())).thenReturn(Optional.of(
+                    new AssetCardMarketDataService.SpotQuote("BTCUSDT", BigDecimal.valueOf(100), BigDecimal.ONE, 80L, at, at)));
+            when(fixture.pool.listForUser(7L)).thenReturn(poolMembers("BTCUSDT"));
+            fixture.service.registerCardStream(7L);
+            fixture.service.flushPrices(at.plusSeconds(1));
+            var sent = org.mockito.ArgumentCaptor.forClass(org.example.trademodel.v41.DashboardLiveEvent.class);
+            verify(fixture.events, atLeastOnce()).publishToUser(eq(7L), sent.capture());
+            assertThat(sent.getAllValues()).filteredOn(e -> "ASSET_CARD_PRICE".equals(e.eventType())).singleElement()
+                    .satisfies(e -> assertThat(e.payload()).containsEntry("priceValidUntil", at.plusSeconds(ttlSeconds)));
+            try (var bundle = AssetCardModelBundle.unavailable("TEST_NO_MODEL")) {
+                AssetCardSnapshot valid = ReflectionTestUtils.invokeMethod(fixture.service, "snapshot", "BTCUSDT", "Bitcoin", at.plusSeconds(1), bundle);
+                assertThat(fixture.json.valueToTree(valid).path("priceValidUntil").asText()).isEqualTo(at.plusSeconds(ttlSeconds).toString());
+                AssetCardSnapshot expired = ReflectionTestUtils.invokeMethod(fixture.service, "snapshot", "BTCUSDT", "Bitcoin", at.plusSeconds(ttlSeconds), bundle);
+                assertThat(expired.spotPrice()).isNull();
+                assertThat(expired.health().status()).isEqualTo("SOURCE_UNAVAILABLE");
+                assertThat(expired.signal().signalAsOf()).isEqualTo(at.minusSeconds(60));
+            }
+        }
+    }
+
+    @Test
+    void freshTradeRestoresOnlyPriceAfterReadOnlySourceFailureWithoutRestoringPrediction() {
+        try (var fixture = new RuntimeFixture(); var bundle = AssetCardModelBundle.unavailable("TEST_NO_MODEL")) {
+            Instant failureAt = Instant.parse("2026-09-12T08:00:10Z");
+            var signal = validLong(failureAt.minusSeconds(60)).invalidated();
+            var stored = new AssetCardSnapshot("BTCUSDT", "Bitcoin", null, null, signal,
+                    AssetCardSnapshot.Risk.unknownFor(signal, AssetCardRiskService.RULE_VERSION, "Test missing distribution"),
+                    new AssetCardSnapshot.Health("SOURCE_UNAVAILABLE", "Test transport lost", failureAt),
+                    signal.signalAsOf(), 11, AssetCardFeatureService.FEATURE_VERSION, null, null);
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
+            when(fixture.market.quote(eq("BTCUSDT"), any())).thenReturn(Optional.of(
+                    new AssetCardMarketDataService.SpotQuote("BTCUSDT", BigDecimal.valueOf(101), BigDecimal.ONE, 81L,
+                            failureAt.plusSeconds(1), failureAt.plusSeconds(1))));
+            AssetCardSnapshot recovered = ReflectionTestUtils.invokeMethod(fixture.service, "snapshot", "BTCUSDT", "Bitcoin", failureAt.plusSeconds(2), bundle);
+            assertThat(recovered.spotPrice()).isEqualByComparingTo("101");
+            assertThat(recovered.health().status()).isNotEqualTo("SOURCE_UNAVAILABLE");
+            assertThat(recovered.signal().calibratedConfidence()).isNull();
+            assertThat(recovered.signal().signalAsOf()).isEqualTo(signal.signalAsOf());
+            assertThat(recovered.cardAsOf()).isEqualTo(stored.cardAsOf());
+            assertThat(recovered.snapshotVersion()).isEqualTo(11);
+            verifyNoInteractions(fixture.mapper, fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void preFailureTradeCannotResurrectPriceEvenIfItArrivesWithinItsTtl() {
+        try (var fixture = new RuntimeFixture(); var bundle = AssetCardModelBundle.unavailable("TEST_NO_MODEL")) {
+            Instant failureAt = Instant.parse("2026-09-12T08:00:10Z");
+            var signal = AssetCardSnapshot.Signal.unavailable("SHADOW", failureAt.minusSeconds(60));
+            var stored = new AssetCardSnapshot("BTCUSDT", "Bitcoin", null, null, signal,
+                    AssetCardSnapshot.Risk.unknownFor(signal, AssetCardRiskService.RULE_VERSION, "Test missing distribution"),
+                    new AssetCardSnapshot.Health("SOURCE_UNAVAILABLE", "Test transport lost", failureAt), signal.signalAsOf(),
+                    11, AssetCardFeatureService.FEATURE_VERSION, null, null);
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
+            when(fixture.market.quote(eq("BTCUSDT"), any())).thenReturn(Optional.of(
+                    new AssetCardMarketDataService.SpotQuote("BTCUSDT", BigDecimal.valueOf(100), BigDecimal.ONE, 80L,
+                            failureAt.minusSeconds(1), failureAt.plusSeconds(1))));
+            AssetCardSnapshot stale = ReflectionTestUtils.invokeMethod(fixture.service, "snapshot", "BTCUSDT", "Bitcoin", failureAt.plusSeconds(2), bundle);
+            assertThat(stale.spotPrice()).isNull();
+            assertThat(stale.health().status()).isEqualTo("SOURCE_UNAVAILABLE");
+            assertThat(stale.risk().overallLevel()).isEqualTo("HIGH");
+            verifyNoInteractions(fixture.mapper, fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
     void readOnlyPriceIdentityPreservesNullableStoredIdAndUsesOnlyTheActualQuoteId() {
         for (Long storedId : new Long[]{null, 41L}) {
             try (var fixture = new RuntimeFixture()) {

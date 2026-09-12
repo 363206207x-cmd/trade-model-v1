@@ -66,12 +66,19 @@ class HomeUiReviewRuntimeContractTest {
         String opportunityCard = slice(source, "function opportunityCard(asset, selected)", "function renderOpportunities(home)");
         String nodeScript = """
                 const assert = require('node:assert/strict');
+                const RealDate = Date;
+                const fixtureNow = RealDate.parse('2026-09-10T00:00:06Z');
+                globalThis.Date = class extends RealDate {
+                  constructor(...args) { super(...(args.length ? args : [fixtureNow])); }
+                  static now() { return fixtureNow; }
+                };
                 var contract = { assetStateView: value => ({ label: value, tone: 'neutral' }) };
                 var labels = Object.freeze({});
-                var window = { setTimeout: () => 1 };
+                var window = { setTimeout: () => 1, clearTimeout: () => {} };
                 eval(require('node:fs').readFileSync('src/main/resources/static/js/home-runtime.js', 'utf8').split('/* Desktop Home runtime */')[0]);
                 var desktop = window.TrineDesktopSemantics;
                 var assetCardSnapshots = new Map(), assetCardFieldVersions = new Map(), assetCardPriceTimers = new Map();
+                var assetCardExpiryTimer = null;
                 var homeCardSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
                 function has(value) { return value !== null && value !== undefined && value !== ''; }
                 function text(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
@@ -92,7 +99,8 @@ class HomeUiReviewRuntimeContractTest {
                   fourHourTrendLabel: '4小时趋势偏多', hasFinal: true, cardSignalDisplayEnabled: true,
                   cardSignal: { symbol, assetName: ['Bitcoin','Ethereum','Solana'][index], snapshotVersion: 1,
                     featureVersion:'test-only',modelVersion:'test-only',calibrationVersion:'test-only',thresholdVersion:'test-only',
-                    spotPrice:100,latestPriceAt:'2026-09-10T00:00:00Z',priceTradeId:1,cardAsOf:'2026-09-10T00:00:00Z',
+                    spotPrice:100,latestPriceAt:'2026-09-10T00:00:00Z',priceValidUntil:'2026-09-10T00:00:10Z',
+                    priceTradeId:1,cardAsOf:'2026-09-10T00:00:04Z',
                     signal:{direction:'WEAK_SHORT',status:'VALID',calibratedConfidence:54,pLong:.18,pShort:.54,
                       oneHourState:'OPPORTUNITY',fourHourTrend:'LONG',signalAsOf:'2026-09-10T00:00:00Z'},
                     risk:{overallLevel:null,items:[],riskVersion:'test-only-risk',riskBasisSide:'SHORT',
@@ -179,7 +187,9 @@ class HomeUiReviewRuntimeContractTest {
                 const clock = freshHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1];
                 assert.match(clock, /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/);
                 assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
-                  .format(new Date(assets[0].cardSignal.cardAsOf)));
+                  .format(new Date(assets[0].cardSignal.signal.signalAsOf)));
+                assert.notEqual(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                  .format(new Date(assets[0].cardSignal.cardAsOf)), 'risk/connection update time is not the displayed analysis clock');
                 for (const field of ['featureVersion','modelVersion','calibrationVersion','thresholdVersion']) {
                   assert.equal(assetCardConfidence({...assets[0].cardSignal,[field]:null}), '—', field);
                   assert.equal(assetCardDirection({...assets[0].cardSignal,[field]:null}), '—', field);
@@ -188,7 +198,8 @@ class HomeUiReviewRuntimeContractTest {
                   payload:{symbol:'BTCUSDT',snapshotVersion:41,spotPrice:321.5,latestPriceAt:'2026-09-10T00:00:05Z',cardAsOf:'2099-01-01T00:00:00Z'}});
                 assert.equal(assetCardSnapshots.get('BTCUSDT').spotPrice, 100, 'missing real trade identity cannot overwrite price');
                 applyAssetCardEvent({eventType:'ASSET_CARD_PRICE',symbol:'BTCUSDT',snapshotVersion:0,
-                  payload:{symbol:'BTCUSDT',snapshotVersion:0,priceTradeId:2,spotPrice:321.5,latestPriceAt:'2026-09-10T00:00:05Z'}});
+                  payload:{symbol:'BTCUSDT',snapshotVersion:0,priceTradeId:2,spotPrice:321.5,
+                    latestPriceAt:'2026-09-10T00:00:05Z',priceValidUntil:'2026-09-10T00:00:15Z'}});
                 const priceHtml = opportunityCard({...assets[0],cardSignal:null},'BTCUSDT');
                 assert.equal(priceHtml.includes('data-live-field="price">$321.5'), true);
                 assert.equal(priceHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1], clock);
@@ -239,7 +250,8 @@ class HomeUiReviewRuntimeContractTest {
                 var selectedSymbol = '';
                 var homeCardSymbols = [];
                 var assetCardSnapshots = new Map(), assetCardFieldVersions = new Map(), assetCardPriceTimers = new Map();
-                var window = {};
+                var assetCardExpiryTimer = null;
+                var window = { setTimeout: () => 1, clearTimeout: () => {} };
                 eval(require('node:fs').readFileSync('src/main/resources/static/js/home-runtime.js', 'utf8').split('/* Desktop Home runtime */')[0]);
                 var desktop = window.TrineDesktopSemantics;
                 var contract = {
