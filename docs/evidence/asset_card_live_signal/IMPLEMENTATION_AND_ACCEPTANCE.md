@@ -1,5 +1,401 @@
 # Asset-card live signal implementation evidence
 
+## V42 PR #1302 final card-only continuation — 2026-09-12
+
+This section supersedes earlier *current status* statements only; historical
+implementation, runtime, budget and incident evidence below is retained.
+No deployment or visible-page acceptance is claimed by this source update.
+
+Gate PR #1303 Head `2024f1bc190bc88b55871f2e73047f82b34cf3a8` changed exactly
+the five Owner-authorized gate/source files. Its manual and Ready-triggered
+reviews completed without blocking findings, its exact-head quality checks
+passed and workflow-contract passed twice. Actual squash merge:
+`c21ecf1e273fa262584312ec7a1ace0d95889801`. The three matching assertions now
+use here-strings, retaining their predicates, failure reasons and bounded
+diagnostics. A 1 MiB early-match regression reproduces old `[141, 0]` pipeline
+statuses and validates the corrected input path; 101 public outer-gate cases
+retain the exact identities, 64 paths and historical-package rejection rules.
+This does not reconstruct the request missing from the original CI log.
+
+The existing business branch merged that main as
+`17a01a588033396e8db02737cae08d809d8d7209`. Audited business Head
+`ef8f0b098e56e15c2bc3c42db040c0360cfc9bed` remains an ancestor; all eleven
+business files were byte-identical immediately after synchronization. No
+force push, reset or replacement of prior implementation occurred.
+
+Initial live-gate queries failed closed because GitHub evidence could not be
+read: the captured exact source-PR request returned EOF. No permission logic,
+authentication setting or query result was changed to recover admission.
+After the real request succeeded, the unchanged business-worktree outer gate
+reported `REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`,
+`IMPLEMENTATION_ALLOWED=true`, `RESOLUTION_BLOCK_REASON=NONE`, count 64.
+Product Source, task validation and complete workflow-contract then passed.
+
+Current work is limited to card display correctness and the existing runtime
+recovery/stop boundary. Final business test counts, candidate identity, remote
+CI/review and deployment observations must be recorded after actual execution;
+the historical results below are not substitute evidence for the new Head.
+The initial trigger of the old 41-minute market stall remains UNKNOWN.
+The old window and original budget ledger must not be reset or resumed.
+SHADOW remains the model mode; production training/calibration samples,
+production metrics and model readiness are not established by test fixtures.
+
+### Preserved-worktree validation and non-destructive candidate build
+
+The nine preserved WIP files remain within the same eleven-file PR scope and
+unchanged 64-path allowlist. Card-only regressions cover both reachable renderers:
+no price-source/time row or pinned-observation copy; no invalid ninth direction
+with a percentage; independent signed risks, partial UNKNOWN and aggregate-only
+rejection; one Beijing analysis clock unaffected by price updates. The Owner
+preview never borrows canonical direction, confidence or risk. Legacy Mark/closed
+bar values lack Spot trade/expiry proof and therefore cannot fill the main price.
+
+Controlled-window persistence now shares bounded admission with the original
+terminal lease. A stopped/expired window admits no new bar, trade, inference,
+label, snapshot or retention write. Pending labels/cursors and original evidence
+remain intact; only already-admitted finite IO may drain. This supersedes older
+release text allowing unrestricted offline maturity after STOP. The real
+single-connection PostgreSQL regression proves that a writer transaction does
+not wait for the lease monitor while its storage check needs that connection.
+Recovered Spot prices withdraw only the older disproved Spot-source DATA fault,
+not other independent risks, prediction invalidation or the analysis clock.
+
+No `clean`, target deletion or history rewrite was used. An initial native-profile
+test run produced the common-checkout identity and correctly failed the provenance
+guard (489 tests, one failure, one local ACL skip). The retained wrong metadata and
+reports were preserved outside Git. The existing plugin was then run only in
+`initialize`, with this worktree's real Git location; default `test` ran without
+Git-location overrides or the identity profile. Generated identity was the actual
+`17a01a588033396e8db02737cae08d809d8d7209`, `git.dirty=true`, not a release artifact.
+The repeated focused run passed: 489 tests, zero failures/errors, one local
+LinuxKit tmpfs POSIX-ACL skip requiring actual final-head Linux CI execution.
+Python numerical tests: 49 passed. Frontend event/expiry/visibility/three-timezone
+matrix, JS syntax and diff checks passed. Assertions were not weakened to hide
+the identity failure. Candidate and merged-main builds must each use a new clean
+isolated checkout and their own generated identity and SHA-256; full Maven,
+packaged-JAR/CI/review and actual Staging evidence remain separate requirements.
+
+### Exact candidate review and bounded recovery correction
+
+Candidate `f993ff613aedd859fdd077781a4b72ab32a0c3d3` was built in a new,
+initially target-free detached worktree, without clean. Its generated Git identity
+matched that clean commit. Full Maven: 5,590 tests, zero failures/errors, 14 skips;
+Python: 49 passed; frontend event/expiry/timezone matrix passed. The standard JAR
+SHA-256 was `eb711dde7bd89ebbd432c696e85bbda2d26686ae1ce48a7d2b9ff45f144dc260`.
+Fifteen loopback WebSocket scenarios loaded production classes extracted from that
+JAR. Fourteen additional native-probe/real isolated credential tests passed. The
+same JAR passed Linux x86_64 Java 17/XGBoost 2.1.4 LONG/SHORT and independent Beta
+interop, maximum error zero; these were temporary fixture models, not production.
+
+Both exact-head quality-gate runs (34688747384 and 34688745793) passed 1,594 tests
+with two explicit opt-in skips; workflow-contract run 34688747462 passed. The real
+Linux writer/ACL class ran all 14 tests without skips in both quality jobs. Local
+full-suite skips were one LinuxKit tmpfs ACL capability case, twelve individually
+controlled legacy P3/P3H/external PostgreSQL cases, and one external CoinGlass
+smoke test. CI did not run the dedicated-Python and retained-rollback-JAR opt-ins;
+those ran locally. No real external database or CoinGlass probe was substituted.
+
+The exact f993ff61 review nevertheless found two P1 issues, so that candidate
+remained Draft and was not merged/deployed. `V42-RECOVERED-RISK-VERSION` exposed a
+same-version read-only risk withdrawal rejected by browser group watermarks.
+`V42-INFERENCE-ADMISSION-LOSS` exposed a closed-bar audit silently lost after a
+transient writer-admission timeout. New regressions first reproduced both failures.
+The correction must retain real CAS versioning on background recovery and zero
+GET writes; a verified newer trade may only withdraw the exact older Spot-source
+DATA claim to UNKNOWN, preserving unrelated evidence and the analysis clock.
+Deferred inference writes preserve immutable point-in-time evidence and the same
+symbol/closed5mAt identity, have at most three total admissions, and never publish
+a retried calculation as an on-time prediction. Exhaustion explicitly stops only
+the card collection under the original ledger; no window/budget is restarted.
+Final post-correction checks and review must be recorded against their own Head.
+The post-review WIP focused suite passed 467 tests, zero failures/errors, one
+local tmpfs ACL skip; Python 49 and the full frontend matrix passed. Product
+Source, task validation, 101 outer-machine cases and workflow-contract passed.
+The new frozen-evidence regression compares all nested values without numeric
+tolerance and preserves exact Instant nanoseconds; it does not require equivalent
+JSON spellings such as `100.0` and `100` to retain different node classes.
+An exhausted write is explicitly UNPERSISTED: its pending payload is in memory,
+not claimed as durable or automatically replayable after restart. The original
+persisted bars and observations are not deleted. No server or new-window action
+was performed for these local regressions.
+
+### Second candidate and exact-head review follow-up
+
+Candidate `1a65ece1bf6a6c6cbad804267b446119e543057b` used another new,
+initially target-free checkout. Full Maven ran 5,597 tests with zero failures,
+zero errors and the same fourteen explicit local skips. Python ran 49 tests;
+the frontend matrix passed. The standard JAR embedded that exact clean identity
+and had SHA-256 `3909c567a939bcb0314ff7b67690772aee353a7e01bb6fb7754f2fcb049d0a0c`.
+Its fifteen extracted-JAR loopback cases, fourteen additional provenance/real
+isolated credential cases, and Linux x86_64 LONG/SHORT raw/Beta interop passed.
+This is candidate/local evidence only, not a merged-main or deployed artifact.
+
+Exact-head workflow-contract run 34696494193 and push quality run 34696492068
+passed. PR quality run 34696494177 failed one of 1,601 tests: the scheduled-label
+test waited for Mockito's second method-entry notification, then queried before
+the second real SQL call completed. A controlled latch reproduced exactly one
+committed LONG label at that instant. The correction retains the original
+two-call and two-label assertions, waits for both real calls to return, and
+additionally checks distinct LONG/SHORT labels. It does not change production
+scheduling or replace the actual database operations with a success stub.
+Both quality jobs executed all fourteen dedicated-writer/ACL cases without skips.
+Their two remaining skips lacked the fixed-Python and rollback-JAR opt-ins,
+which were executed separately in the local candidate verification.
+
+The exact-head review then reported `V42-INFERENCE-RETRY-COMMIT-DEADLINE`:
+the deferred write classified its result using the time before synchronous SQL,
+so a write entering at +14.9 seconds could return after +15 seconds without an
+explicit timeout classification. That candidate remains Draft and unmerged.
+The correction must distinguish abandonment of timely publication from observed
+database-return timing, retain immutable original evidence, and measure the
+return only after the synchronous mapper call. No existing history row, table,
+permission or deadline is to be rewritten. Post-correction results require a
+new candidate and cannot reuse these checks as a passing final-head result.
+
+The deferred-write regression reproduced the +14.9s entry/+15.1s return case:
+the old classification was PERSISTENCE_DELAYED. The correction preserves the
+original calculation and classifies abandoned publication as OUTCOME/TIMED_OUT
+with an explicit abandonment basis. It never predicts a future commit time in
+an immutable pre-write row. After the synchronous mapper returns, bounded
+structured evidence records its observed return time, deadline and insertion,
+existing-winner or unknown result. That is not the database's internal commit
+timestamp. If those logs are unavailable, actual return timing is UNKNOWN; it
+cannot be reconstructed from persistenceAttemptAt. The private clock uses UTC
+in production and adds no API, environment setting or dependency. A controlled
+test clock is necessary because this repository's existing mock maker does not
+support static Instant mocks; that initial test-setup error is not a behavior RED.
+No new history receipt, database permission or post-write history UPDATE is used.
+
+The same review also identified a pre-existing first-write timing gap. Closing
+it must not claim that a pre-write COMPLETED calculation proves timely database
+publication. New inference evidence requires a successful snapshot for runtime
+recovery; an audit without that snapshot remains private, with its original
+training inputs retained. This deliberately fails closed if a snapshot failed
+and the process restarted, rather than restoring an unconfirmed publication.
+Legacy unmarked evidence is not rewritten. Tests of these deadline branches do
+not by themselves prove end-to-end production/SSE publication latency, which
+still needs actual runtime evidence. Model readiness remains NO.
+
+Post-correction WIP validation ran 471 focused tests with zero failures/errors
+and one local LinuxKit ACL skip, plus Python 49 and the frontend matrix. A prior
+whole-service command without the required Docker connection reported three
+environment errors; the corrected isolated PostgreSQL run executed those cases,
+not skipped them. The first-write/history RED had two assertion failures and
+zero errors; its committed-snapshot positive control passed. The subsequent
+focused run passed all three new cases, all deferred-return scenarios, the
+strengthened scheduled-label test and every retained card contract assertion.
+Product Source, task validation, 101 exact-machine scenarios and full
+workflow-contract passed; syntax/diff and the unchanged 64-path fingerprint
+passed. The real outer resolver recognized V42/#1302 and correctly blocked the
+dirty worktree pending an ordinary candidate commit. A clean, synchronized
+candidate must be checked again; no output or permission was overridden.
+Read-only source review found no remaining P1/P2 in this correction. These WIP
+checks are not the next candidate's full-suite, remote CI or deployment result.
+
+### Third candidate and completed-retirement test synchronization
+
+Candidate `7572956e1777f60527733375bc9ba31a475aa35a` was built in another new,
+initially target-free checkout without clean. Full Maven passed 5,601 tests,
+zero failures/errors and fourteen explicitly recorded local skips; Python 49
+and the frontend matrix passed. Its clean standard JAR embedded that full SHA,
+with SHA-256 `b8c85b4dceda1679535394399116080805058a44f2c31b6815e217eabb0b3b2c`.
+The same JAR passed fifteen real localhost WebSocket scenarios, fourteen
+native-probe/real isolated credential cases and Linux x86_64 LONG/SHORT raw/Beta
+interop with maximum error zero. No fixture was installed as a production model.
+Product Source, task validation, 101 exact-machine cases, full workflow-contract
+and the synchronized real remote-head outer gate passed; source hashes and
+clean identity were unchanged during those checks.
+
+Exact-head workflow run 34700239129 and PR quality run 34700239175 passed.
+Push quality run 34700236489 failed one of 1,605 tests: the real-loopback
+expired-check test observed `socket=null` before the same retirement operation
+had cleared its quote. A bounded test-private logging latch reproducibly paused
+that exact intermediate state: the old immediate-empty assertion failed while
+trade 10 was still present. This is a test completion-observation race, not
+evidence that the completed retirement retains a quote. The correction waits
+for the real BTC PRICE_FAILURE notification, which follows quote removal, then
+retains the original empty-price, successful fresh-trade recovery, connection
+count and unchanged OPEN-budget assertions. It also proves that the intermediate
+state is not the completion signal. The wait is bounded below the unchanged
+10-second price TTL; expiry cannot conceal missing lifecycle cleanup. Production
+connection code, timeouts and permission/budget semantics are unchanged.
+
+Both Linux quality runs executed all fourteen dedicated-writer/ACL and twenty-five
+native-infrastructure cases without skips. Their two opt-in skips lacked the
+fixed Python and retained rollback JAR, separately tested with this local
+candidate. The failed push check is not replaced by the other job's success;
+the test-only follow-up must receive its own full validation, candidate identity,
+remote checks and substantive review before the release conditions are met.
+
+### Fourth candidate review: atomic risk recovery and immutable trade admission
+
+Candidate `e0c67417150de6b23cb7ff2b779080d6812a1fec` passed a fresh,
+initially target-free full build: 5,601 tests, zero failures/errors, fourteen
+explicit local skips, Python 49 and the frontend matrix. Its standard JAR
+embedded that exact clean identity and SHA-256
+`cbee44ac495cfe3b0963d51016271338781a29b1cd9ecf9b4c29db3f514598d1`.
+The same JAR passed fifteen localhost lifecycle scenarios, fourteen native/real
+isolated credential checks and Linux x86_64 LONG/SHORT raw/Beta fixture parity.
+Exact-head workflow 34701670637 and both quality runs 34701670740/34701667073
+passed. Each quality run executed 1,605 tests with zero failures/errors and two
+known opt-in skips; Linux writer/ACL and native-infrastructure cases ran without
+skips. These results identify e0 only, not its subsequent source corrections.
+
+The substantive e0 review still identified two P1 issues, so it was not merged.
+A fresh trade must not rewrite previously committed risk in a read-only GET or
+browser PRICE merge, even when it disproves an older Spot-source claim. Recovery
+must allocate, persist and publish one real background CAS version. While that
+write is blocked, price remains independently current, the committed risk and
+its observation time/version remain intact, and a compact pending status can
+explain the recovery. Only an accepted committed RISK snapshot withdraws the
+old source fault. Unrelated HIGH evidence, invalidated prediction status and the
+analysis clock remain intact. This supersedes the earlier proposed read-only
+withdrawal described above; it does not relax field identity or version checks.
+
+The trade-admission regression first reproduced two lost-sample failures. The
+correction freezes the original selected quote, observation and full serialized
+payload before bounded retries, independently coalescing the newest unselected
+trade. A single flush can be active, each write uses the original collection
+lease, and at most three admissions are attempted. Exhaustion stops only that
+original window and explicitly retains UNPERSISTED evidence in process memory;
+STOP does not clear the pending points or permit another write. This is not a
+durable restart queue. Six focused tests passed with zero failures/errors/skips,
+including a real disposable H2 insert-then-exception test proving that an
+ambiguous committed result retries the identical identity/payload without a
+duplicate row. Control-flow doubles are not claimed as new PostgreSQL permission
+or real-runtime evidence. Existing PostgreSQL isolation checks remain required.
+
+Appendix I.5 requires the card corner clock to use the browser's user timezone.
+The card-only formatter and exact UTC/Shanghai/New York expectations are
+corrected accordingly; shared alert/service Beijing-time functions are unchanged.
+Earlier fixed-Beijing card evidence is historical, not the current contract.
+For INVALIDATED display, the latest Owner instruction explicitly requires
+"方向 — · 置信 —" when no valid direction/model/identity/complete prediction
+exists. The internal original direction and risk basis remain available for
+audit, with a separate "已失效" status; no opposite signal is synthesized. That
+newer narrow display instruction is supplied for substantive review rather than
+silently resolving the older Appendix I.3 review or editing governance to match.
+
+Frontend RED checks reproduced same-version risk mutation and the UTC clock
+mismatch. The corrected event matrix passed, including version zero and later
+versions, PRICE/GET/Home interleaving, visibility recovery, independent HIGH
+evidence, committed-risk recovery and stale replay rejection. Both card-only
+JavaScript fixtures embedded in Java contract tests also ran in all three
+timezones. Three backend regressions first failed with three assertions and no
+errors, then passed with zero failures/errors/skips after removing the read-only
+recovery mutation. They cover both admission stages, failed CAS, permanent STOP,
+unchanged full risk JSON/asOf/version in GET and SSE, and exactly one background
+commit/event after capacity returns without another trade. A following flush
+produces no duplicate write or event. The complete new candidate build, its remote
+checks and review must still be recorded after execution. The combined WIP
+focused run passed 543 tests across 22 classes, zero failures/errors and one
+local LinuxKit ACL capability skip; Python 49, the complete frontend event
+matrix, JS syntax and diff checks also passed. Generated WIP identity was the
+actual e0 parent with dirty=true, never a release artifact. The whole PR remains
+eleven files inside the unchanged 64 exact paths. Product Source, task validation,
+101 exact-machine cases, complete workflow-contract and syntax/diff checks passed;
+nine source/continuation anchors remain ancestors. The synchronized clean final
+candidate still needs its own real outer admission. No current production model,
+deployed page, new external request or new collection window is claimed.
+
+## V42 stream recovery and stale-price correction — 2026-09-12
+
+This is the same V42 card-only task, not a new model or algorithm. The business
+branch was synchronized without loss with merged main
+`34b943eece4f19c927b5d96aa50fe17e9025f182`; the preserved-history continuation
+baseline is `9e0699fad12d9ab87731afb6522a90de74648746`. Before editing, the real
+outer resolver reported AUTHORIZED_IMPLEMENTATION_PACKAGE,
+IMPLEMENTATION_ALLOWED=true and RESOLUTION_BLOCK_REASON=NONE with no open PR.
+The 64 implementation paths and their fingerprint are unchanged. A newly
+created business PR requires its own exact continuation registration; the
+already-merged #1300 is not permission for arbitrary future PRs.
+
+Retained runtime evidence proves that recorded market observations stopped inside the approved
+window and no second connection attempt occurred, while budget checks still
+reported OPEN/RUNNING. It does not prove the first underlying disconnect cause:
+the incident lacks a close/error timeline and contemporaneous Java queue trace.
+The old collection window, persisted observations and original ledger are not
+reset or resumed by this correction. A new release/window remains a separate
+approval; no server, external Provider or Owner-data operation is performed.
+
+Tests first reproduced the local-abort retained-socket path, retired handshake
+single-flight failure, newer SOURCE_UNAVAILABLE/null reconciliation retaining
+an old price, missing independently enforceable expiry, and fresh/late trade
+recovery errors. Further substantive review identified stale signal/risk basis
+promotion and retired-frame mutation races; those are tested as correctness
+defects, not deferred as formatting concerns.
+
+The correction retains the configured ten-second price TTL, emits
+`priceValidUntil = actual trade time + configured TTL`, and revokes price at
+that boundary. The browser uses a single local expiry timer even when SSE and
+reconciliation fail; receipt time cannot extend validity. Only a genuinely new,
+unexpired trade can restore price. Analysis display uses signalAsOf; PRICE and
+connection events do not update that clock or manufacture risk/percentages.
+Risk, signal, persistence and price remain separate fields. Java17 automatically
+answers received Ping frames; no extra heartbeat or Provider frequency is added.
+
+Validation is local/isolated only; no actual release/window is executed:
+
+- Focused Service/MarketData/HomeUI: 112 tests, zero failures/errors/skips.
+  The market class has 55 tests, including 10 real localhost WebSocket scenarios
+  and four deterministic race scenarios. Initial failing tests were retained
+  as regressions, not removed or weakened.
+- Full Maven: 5,573 tests, zero failures, zero errors, 14 skips across 520 classes.
+  Disposable PostgreSQL actually ran. Fixed Python/XGBoost 2.1.4 LONG/SHORT
+  interoperability ran, with raw prediction delta zero and maximum beta delta
+  2.20228566286e-20 (synthetic fixture only, not production model evidence).
+  The exact retained pre-V24 JAR also started after V24 in an isolated database,
+  retaining all 23 old migrations byte-for-byte and all new card tables/data.
+- Python numerical suite: 49 tests passed. Frontend event matrix, UTC/Shanghai/
+  New York subprocesses, JS syntax and diff checks passed. Two sliced-JS test
+  fixtures now include the actual expiry dependency; zero existing assertions
+  were removed. They verify exact expiry and expire-before-GET after visibility.
+- Product Source, task validation, exact machine tests (including 64 public
+  outer V42 cases), and workflow-contract passed. Before editing, clean-tree
+  admission passed; during preserved WIP the unchanged outer clean-tree guard
+  correctly reports BLOCKED_WORKTREE_DIRTY. This is not misreported as current
+  clean admission or bypassed by editing the gate.
+- Standard-JAR behavior test: the test-only runner verifies BOOT-INF/classes
+  code source and bytes against the real JAR for MarketData/Service/Snapshot,
+  then passes all 14 loopback/race scenarios under Java17. The precommit WIP JAR
+  is explicitly dirty and not deployable; the clean final commit is packaged
+  separately and receives its own SHA-256 and repeated runner receipt.
+- Substantive local review closed V42-STALE-SAFETY-BASIS and
+  V42-HANDSHAKE-OPEN-ORDER after reproduction/regression. Final remote Head CI
+  and review are separate evidence, never inferred from this local review.
+
+The exact 14 skipped tests are:
+
+1. AssetCardDataSourceConfigurationTest.realLinuxSystemdAclAndReadOnlyMountPermitOnlyTheExactServiceIdentity:
+   this local LinuxKit kernel lacks tmpfs POSIX ACL; required Linux CI must run it.
+2. ControlledCurrentStateCloneFlywayActionTest.validatesOrMigratesOnlyAnApprovedLocalP3Database:
+   no P3 controlled database action opt-in.
+3–9. ControlledCurrentStateContentFingerprintTest: rollbackRestoresFingerprint,
+   fingerprintOutputDoesNotContainRawModifiedValues, sameDataProducesMatchingFingerprint,
+   sameRowCountTimeMutationIsDetected, sameRowCountPlanBoundaryMutationIsDetected,
+   sessionTimezoneDoesNotChangeFingerprint, sameRowCountStatusMutationIsDetected:
+   no approved P3 content database environment. These are not Owner-data checks.
+10. ControlledGeneratedReleaseLikeFixtureFlywayTest.createsOnlyTheApprovedLocalGeneratedFixtureAtFlywayV6:
+    no P3 generated-fixture opt-in.
+11. ControlledGreenfieldFlywayV7ActionTest.migratesExactEmptyGreenfieldDatabaseFromV1ToV7AndRepeatsIdempotently:
+    no P3-G database action opt-in.
+12. ControlledP3hComposeOfflineSmokeTest.disposableComposeProvesBootstrapSecretsProxyAndReadOnlyRole:
+    no legacy P3H Compose opt-in.
+13. ControlledPostgreSqlFlywaySmokeTest.controlledExternalPostgreSqlFlywayMigrationsApplyWhenExplicitlyConfirmed:
+    no external PostgreSQL environment; no persistent database connection attempted.
+14. CoinGlassControlledSmokeTest.controlledSmokeUsesCoordinatorAndReturnsSanitizedSummary:
+    external-call opt-in absent; no CoinGlass call attempted.
+
+Earlier failed runs are not hidden: the first full attempt had four failures
+(two missing JS fixture dependencies, old generated Git provenance, wrong Python
+executable); the second had only the Git provenance failure. The final run used
+the existing process-only Docker API 1.44, fixed Python, and actual worktree
+metadata generated by the existing profile in a separate Git-bound process.
+No dependency, Git identity assertion, test skip condition or system config was
+changed to obtain the passing run. Final PR/clean artifact receipts are delivered
+with the exact-head review; earlier sections below remain historical evidence.
+MODEL_MODE=SHADOW; PRODUCTION_MODEL_READY=NO; CURRENT_PHASE_DONE=NO.
+
 ## PREPARED storage review correction — 2026-09-12
 
 The exact a0f61b92 review found V42-RUNTIME-001: mandatory ReadWritePaths were

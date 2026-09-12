@@ -210,7 +210,14 @@ class GlobalFrozenUiAlignmentContractTest {
         Process process = new ProcessBuilder("node", "-e", """
                 const assert=require('node:assert/strict'),fs=require('node:fs');
                 const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
-                const window={};eval(source.split('/* Desktop Home runtime */')[0]);
+                const RealDate=Date;let now=RealDate.parse('2026-09-08T01:00:05Z'),timerId=0,assetCardExpiryTimer=null;
+                class ControlledDate extends RealDate {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+                global.Date=ControlledDate;
+                const expiryTimers=new Map(),fields=new Map(['price','status','card-time'].map(name=>[name,{textContent:'',hidden:false}]));
+                const liveCard=()=>({querySelector:selector=>fields.get(selector.match(/data-live-field="([^"]+)"/)?.[1]),setAttribute(){}});
+                const document={hidden:false};
+                const window={setTimeout(fn,delay){expiryTimers.set(++timerId,{fn,delay});return timerId;},
+                    clearTimeout(id){expiryTimers.delete(id);}};eval(source.split('/* Desktop Home runtime */')[0]);
                 const desktop=window.TrineDesktopSemantics;
                 const assetCardSnapshots=new Map(),assetCardFieldVersions=new Map(),assetCardPriceTimers=new Map();
                 const homeCardSymbols=['TESTUSDT'];
@@ -224,7 +231,8 @@ class GlobalFrozenUiAlignmentContractTest {
                 const cardTypes=['CHASE','SHOCK','REVERSAL','CROWDING','LIQUIDATION','LIQUIDITY','EVENT','DATA'];
                 const cardSignal={symbol:'TESTUSDT',snapshotVersion:1,featureVersion:'test-only-feature',modelVersion:'test-only-model',
                     calibrationVersion:'test-only-calibration',thresholdVersion:'test-only-threshold',
-                    signal:{direction:'LONG',status:'VALID',calibratedConfidence:65,signalAsOf:'2026-09-08T01:00:00Z'},
+                    spotPrice:100,priceTradeId:1,latestPriceAt:'2026-09-08T01:00:00Z',priceValidUntil:'2026-09-08T01:00:10Z',
+                    signal:{direction:'LONG',status:'VALID',calibratedConfidence:65,pLong:.65,pShort:.22,signalAsOf:'2026-09-08T01:00:00Z'},
                     risk:{overallLevel:'LOW',riskVersion:'test-only-risk',riskBasisSide:'LONG',riskBasisDirection:'LONG',
                       riskBasisSignalAsOf:'2026-09-08T01:00:00Z',riskMarketAsOf:'2026-09-08T01:00:00Z',
                       items:cardTypes.map(type=>({type,assessmentStatus:'ASSESSED',level:'NONE'}))}};
@@ -256,10 +264,37 @@ class GlobalFrozenUiAlignmentContractTest {
                       {type:'SHOCK',assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:72,source:'ISOLATED_TEST'}]}}};
                 const html=drawCard(risky,'TESTUSDT');
                 assert.equal(desktop.hasConfirmedRisks(risky),true);
-                for(const value of ['asset-card-risk-high">急涨急跌·高','asset-card-risk-medium">追高·中','asset-card-risk-high">高',
+                for(const value of ['asset-card-risk-high">急涨急跌·高','asset-card-risk-medium">追高风险·中','asset-card-risk-high">高',
                     'tabindex="0" data-desktop-hover="risk"','aria-haspopup="dialog"','aria-label="TESTUSDT 风险详情"']) assert.ok(html.includes(value),value);
                 assert.equal((desktop.riskDrawer(risky).match(/risk-evidence-item/g)||[]).length,2);
                 for(const value of ['72','ISOLATED_TEST','Independent fixture metric']) assert.ok(desktop.riskDrawer(risky).includes(value));
+                for(const [direction,side,name] of [['LONG','LONG','追高风险'],['SHORT','SHORT','追空风险'],['RANGE','NON_DIRECTIONAL','位置风险']]) {
+                    const signal={...cardSignal.signal,direction,calibratedConfidence:side==='LONG'?65:side==='SHORT'?22:null};
+                    const partial={...cardSignal,signal,risk:{...cardSignal.risk,overallLevel:'HIGH',
+                        riskBasisSide:side,riskBasisDirection:direction,items:cardTypes.map(type=>type==='CHASE'
+                          ?{type,assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:2,unit:'ATR',source:'ISOLATED_SIGNED_FACT',
+                            asOf:'2026-09-08T01:00:02Z',reason:'Independent signed fixture'}
+                          :{type,assessmentStatus:'UNKNOWN',level:null,reason:'Test-only evidence missing'})}};
+                    const projection=drawCard({...asset,riskLevel:'LOW',cardSignal:partial},'TESTUSDT');
+                    assert.ok(projection.includes(name+'·高'));
+                    assert.ok(!projection.includes('asset-card-risk-low">低'));
+                    const detail=assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT'));
+                    assert.equal((detail.match(/risk-evidence-item/g)||[]).length,1);
+                    const userClock=value=>new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                      .format(new Date(value));
+                    assert.ok(detail.includes('ISOLATED_SIGNED_FACT')&&detail.includes(userClock('2026-09-08T01:00:02Z')));
+                    assert.equal(projection.match(new RegExp('data-live-field="card-time"[^>]*>([^<]*)</time>'))[1],
+                      userClock(signal.signalAsOf));
+                    assert.equal(assetCardSnapshots.get('TESTUSDT').risk.items.length,8);
+                    if(direction==='RANGE')assert.ok(projection.includes('data-live-field="confidence">—'));
+                }
+                for(const overallLevel of ['HIGH','MEDIUM']) {
+                    const aggregateOnly={...cardSignal,risk:{...cardSignal.risk,overallLevel,
+                        items:cardTypes.map(type=>({type,assessmentStatus:'UNKNOWN',level:null,reason:'No independent fixture evidence'}))}};
+                    const projection=drawCard({...asset,riskLevel:'HIGH',cardSignal:aggregateOnly},'TESTUSDT');
+                    assert.match(projection,/data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
+                    assert.ok(!assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT')).includes('risk-evidence-item'));
+                }
                 for(const invalid of [
                     {...risky.cardSignal,signal:null},
                     {...risky.cardSignal,risk:{...risky.cardSignal.risk,riskVersion:null}},
@@ -268,9 +303,20 @@ class GlobalFrozenUiAlignmentContractTest {
                     {...risky.cardSignal,riskVersion:'other-risk-version'}]) {
                     const rejected=drawCard({...risky,cardSignal:invalid},'TESTUSDT');
                     assert.match(rejected,/data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
-                    assert.ok(!rejected.includes('急涨急跌·高')&&!rejected.includes('追高·中'));
+                    assert.ok(!rejected.includes('急涨急跌·高')&&!rejected.includes('追高风险·中'));
                     assert.ok(!assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT')).includes('risk-evidence-item'));
                 }
+                const priced=drawCard(risky,'TESTUSDT'),beforeExpiry=assetCardSnapshots.get('TESTUSDT');
+                assert.ok(priced.includes('data-live-field="price">$100'));
+                assert.equal(expiryTimers.size,1);assert.equal([...expiryTimers.values()][0].delay,5000);
+                now=RealDate.parse('2026-09-08T01:00:10Z');
+                [...expiryTimers.values()][0].fn();
+                const expired=assetCardSnapshots.get('TESTUSDT');
+                assert.equal(expired.spotPrice,null);assert.equal(expired.priceValidUntil,null);assert.equal(expired.priceExpired,true);
+                assert.equal(fields.get('price').textContent,'—');assert.equal(fields.get('status').textContent,'价格过期');
+                assert.equal(expired.risk,beforeExpiry.risk);assert.equal(expired.signal,beforeExpiry.signal);
+                assert.equal(assetCardOverallRisk(expired),'HIGH');assert.equal(expired.signal.signalAsOf,'2026-09-08T01:00:00Z');
+                assert.ok(assetCardRiskDrawer(expired).includes('72'));assert.equal(expiryTimers.size,0);
                 console.log('PASS');
                 """).redirectErrorStream(true).start();
         boolean completed = process.waitFor(30, TimeUnit.SECONDS);

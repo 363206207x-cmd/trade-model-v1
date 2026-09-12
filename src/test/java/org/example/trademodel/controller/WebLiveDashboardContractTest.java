@@ -264,14 +264,30 @@ class WebLiveDashboardContractTest {
                 const assert=require('node:assert/strict'),fs=require('node:fs');
                 const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
                 const handlers={},timers=new Map();let seq=0,refreshes=0,cardRefreshes=0,streams=0;
+                const RealDate=Date;let now=RealDate.parse('2026-09-08T01:00:05Z'),assetCardExpiryTimer=null;
+                class ControlledDate extends RealDate {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+                global.Date=ControlledDate;
+                const timeouts=new Map(),assetCardSnapshots=new Map(),assetCardFieldVersions=new Map(),assetCardPriceTimers=new Map();
+                const homeCardSymbols=['BTCUSDT'],fields=new Map(['price','status','card-time'].map(name=>[name,{textContent:'',hidden:false}]));
+                const liveCard=()=>({querySelector:selector=>fields.get(selector.match(/data-live-field="([^"]+)"/)?.[1]),setAttribute(){}});
                 let homeFallbackTimer=null,homePollIntervalMs=0,homeStreamConnected=false,homeEventSource=null,
                     homeRuntimeStarted=false,homeAbortController=null,assetCardAbortController=null,homeLiveState='',currentHome={},selectedSymbol='BTCUSDT';
                 const document={hidden:false,addEventListener:(type,fn)=>handlers[type]=fn};
                 function EventSource(){streams++;this.close=()=>{};this.addEventListener=()=>{};}
                 const window={EventSource,setInterval(fn,delay){timers.set(++seq,{fn,delay});return seq;},
-                    clearInterval(id){timers.delete(id);},addEventListener(){}};
+                    clearInterval(id){timers.delete(id);},setTimeout(fn,delay){timeouts.set(++seq,{fn,delay});return seq;},
+                    clearTimeout(id){timeouts.delete(id);},addEventListener(){}};
                 eval(source.split('/* Desktop Home runtime */')[0]);
-                const loadHome=async()=>{refreshes++;},lightweightHomeRefresh=async()=>{cardRefreshes++;},
+                const desktop=window.TrineDesktopSemantics;
+                eval(source.slice(source.indexOf('function assetTicker('),source.indexOf('function renderOpportunities(')));
+                const basis={symbol:'BTCUSDT',snapshotVersion:10,spotPrice:100,priceTradeId:1,
+                    latestPriceAt:'2026-09-08T01:00:00Z',priceValidUntil:'2026-09-08T01:00:10Z',
+                    signal:{direction:null,status:'SHADOW',signalAsOf:'2026-09-08T01:00:00Z'},risk:{overallLevel:'HIGH'}};
+                assetCardDisplaySymbols.add('BTCUSDT');assetCardSnapshots.set('BTCUSDT',basis);
+                scheduleAssetCardExpiry();assert.equal(timeouts.size,1);assert.equal([...timeouts.values()][0].delay,5000);
+                let clearedBeforeRefresh=false;
+                const loadHome=async()=>{refreshes++;clearedBeforeRefresh=assetCardSnapshots.get('BTCUSDT').spotPrice===null;},
+                    lightweightHomeRefresh=async()=>{cardRefreshes++;},
                     renderHeader=()=>{},announce=()=>{},reportHomeRequestFailure=()=>{},applyHomeLiveEvent=()=>{};
                 eval(source.slice(source.indexOf('function reportAssetCardRequestFailure('),source.indexOf('function stableSubmissionId('))
                     + ';startHomeLiveRuntime();startHomeLiveRuntime();');
@@ -282,8 +298,16 @@ class WebLiveDashboardContractTest {
                 homeEventSource.onerror();homeEventSource.onerror();
                 assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,15000);
                 document.hidden=true;handlers.visibilitychange();assert.equal(timers.size,0);
+                now=RealDate.parse('2026-09-08T01:00:11Z');
+                assert.equal(assetCardSnapshots.get('BTCUSDT').spotPrice,100,'background timers were deliberately not fired');
                 document.hidden=false;handlers.visibilitychange();assert.equal(refreshes,1);assert.equal(timers.size,1);
                 assert.equal([...timers.values()][0].delay,15000);
+                assert.equal(clearedBeforeRefresh,true,'actual expiry must run before the visibility GET');
+                assert.equal(assetCardSnapshots.get('BTCUSDT').spotPrice,null);assert.equal(fields.get('price').textContent,'—');
+                assert.equal(fields.get('status').textContent,'价格过期');assert.equal(timeouts.size,0);
+                assert.equal(assetCardSnapshots.get('BTCUSDT').signal,basis.signal);assert.equal(assetCardSnapshots.get('BTCUSDT').risk,basis.risk);
+                assert.equal(assetCardSnapshots.get('BTCUSDT').signal.signalAsOf,'2026-09-08T01:00:00Z');
+                assert.equal(cardRefreshes,2);assert.equal(streams,2);
                 console.log('PASS');
                 """);
     }
