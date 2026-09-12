@@ -24,6 +24,7 @@ import java.util.concurrent.*;
 @Service
 public class AssetCardService implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AssetCardService.class);
+    private final java.time.Clock persistenceClock = java.time.Clock.systemUTC();
     private final AssetCardProperties properties;
     private final AssetCardMarketDataService market;
     private final AssetCardMapper mapper;
@@ -388,6 +389,7 @@ public class AssetCardService implements AutoCloseable {
                         "closed5mAt", closedAt, "completedAt", completedAt, "outcome", "COMPLETED",
                         "thresholdVersion", model.thresholdVersion(), "riskVersion", riskVersion(model),
                         "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS",
+                        "publicationRequiresSnapshot", true,
                         "trainingEligible", frame.trainingEligible(), "trainingQualificationReasons", frame.trainingQualificationReasons(),
                         "providerEvidenceMissingReasons", providerSnapshot == null ? List.of("COINGLASS_NOT_YET_OBSERVED") : providerSnapshot.missingReasons());
                 String encoded = json.writeValueAsString(audit);
@@ -400,6 +402,15 @@ public class AssetCardService implements AutoCloseable {
                         try { restoreAudit(symbol, existing.payloadJson(), completedAt, model); }
                         catch (JsonProcessingException invalid) { throw new IllegalStateException("INVALID_CARD_AUDIT", invalid); }
                     });
+                    return;
+                }
+                Instant persistenceReturnedAt = at.plusNanos(Math.max(0, System.nanoTime() - startedNanos));
+                if (persistenceReturnedAt.isAfter(deadline)) {
+                    // Calculation evidence remains immutable, but its pre-write completion is not publication proof.
+                    // A new standalone audit cannot restore runtime without a successfully persisted snapshot.
+                    failed(Field.SIGNAL, symbol, "本轮闭线持久化超过15秒，等待下一闭线");
+                    log.warn("[asset-card] Inference publication TIMED_OUT symbol={} closed5mAt={} completedAt={} persistenceReturnedAt={} deadline={}",
+                            symbol, closedAt, completedAt, persistenceReturnedAt, deadline);
                     return;
                 }
                 signalStates.put(symbol, state); featureFrames.put(symbol, frame);
@@ -477,26 +488,49 @@ public class AssetCardService implements AutoCloseable {
             try {
                 boolean[] inserted = {false};
                 boolean accepted = persistCard(pending.identity.symbol(), () -> {
-                    Instant writeAt = Instant.now();
+                    Instant writeAt = persistenceClock.instant();
                     try {
                         var audit = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(pending.encoded);
                         String originalOutcome = audit.path("outcome").asText();
                         if ("COMPLETED".equals(originalOutcome)) {
-                            // Retried writes never claim timely publication: the SQL commit itself can cross the deadline.
+                            // Admission rejection forfeits this boundary's timely publication. This immutable
+                            // outcome does not pretend to know when a not-yet-completed transaction will return.
                             audit.put("originalOutcome", originalOutcome);
-                            audit.put("outcome", writeAt.isAfter(pending.identity.closedAt().plusSeconds(15)) ? "TIMED_OUT" : "PERSISTENCE_DELAYED");
+                            audit.put("outcome", "TIMED_OUT");
+                            audit.put("timeoutBasis", "PUBLICATION_ABANDONED_AFTER_ADMISSION_REJECTION");
                             audit.put("dataKind", "LIVE_OBSERVED_CARD_OUTCOME");
                         }
-                        audit.put("persistenceStatus", writeAt.isAfter(pending.identity.closedAt().plusSeconds(15))
-                                ? "AFTER_PUBLICATION_DEADLINE" : "RETRIED_WITHOUT_PUBLICATION");
+                        audit.put("persistenceStatus", "RETRIED_WITHOUT_PUBLICATION");
                         audit.set("persistenceAttemptAt", json.valueToTree(writeAt));
-                        int saved = mapper.saveInference(pending.identity.symbol(), pending.identity.closedAt(), writeAt, json.writeValueAsString(audit));
-                        if (saved == 1) inserted[0] = true;
+                        String encoded = json.writeValueAsString(audit);
+                        int saved;
+                        try {
+                            saved = mapper.saveInference(pending.identity.symbol(), pending.identity.closedAt(), writeAt, encoded);
+                        } catch (RuntimeException failure) {
+                            recordInferenceWriteReturn(pending, writeAt, persistenceClock.instant(), "UNKNOWN");
+                            throw failure; // Never infer a rollback or a successful commit from an exception.
+                        }
+                        // saveInference's synchronous transaction has returned. This is a return observation,
+                        // not the database's internal commit timestamp; never backfill it into the immutable row.
+                        Instant returnedAt = persistenceClock.instant();
+                        if (saved == 1) {
+                            inserted[0] = true;
+                            recordInferenceWriteReturn(pending, writeAt, returnedAt, "INSERTED");
+                        }
                         // selectInference owns the canonical .999/.000 closed-boundary key; do not reinterpret it here.
-                        else if (saved != 0 || mapper.selectInference(pending.identity.symbol(), pending.identity.closedAt(), Instant.now())
-                                .filter(row -> pending.identity.symbol().equals(row.symbol())
-                                        && row.recordKind() == AssetCardMapper.HistoryKind.INFERENCE).isEmpty())
-                            throw new IllegalStateException("CARD_OUTCOME_WINNER_UNAVAILABLE");
+                        else {
+                            boolean winner;
+                            try {
+                                winner = saved == 0 && mapper.selectInference(pending.identity.symbol(), pending.identity.closedAt(), Instant.now())
+                                        .filter(row -> pending.identity.symbol().equals(row.symbol())
+                                                && row.recordKind() == AssetCardMapper.HistoryKind.INFERENCE).isPresent();
+                            } catch (RuntimeException failure) {
+                                recordInferenceWriteReturn(pending, writeAt, returnedAt, "WINNER_UNKNOWN");
+                                throw failure;
+                            }
+                            recordInferenceWriteReturn(pending, writeAt, returnedAt, winner ? "EXISTING_WINNER" : "WINNER_UNAVAILABLE");
+                            if (!winner) throw new IllegalStateException("CARD_OUTCOME_WINNER_UNAVAILABLE");
+                        }
                     } catch (JsonProcessingException invalid) { throw new IllegalStateException("CARD_OUTCOME_SERIALIZATION_FAILED", invalid); }
                 });
                 if (accepted) {
@@ -512,6 +546,13 @@ public class AssetCardService implements AutoCloseable {
             }
             scheduleInferenceWrite(pending);
         }
+    }
+
+    private void recordInferenceWriteReturn(PendingInferenceWrite pending, Instant writeAt, Instant returnedAt, String result) {
+        Instant deadline = pending.identity.closedAt().plusSeconds(15);
+        log.info("[asset-card] Inference persistence returned symbol={} closed5mAt={} attempt={} writeAt={} returnedAt={} deadline={} returnedAfterDeadline={} result={}",
+                pending.identity.symbol(), pending.identity.closedAt(), pending.attempts, writeAt, returnedAt,
+                deadline, returnedAt.isAfter(deadline), result);
     }
 
     static boolean latestIntervalClosed(List<AssetCardFeatureService.Bar> bars, String interval, Instant closedAt) {
@@ -539,7 +580,7 @@ public class AssetCardService implements AutoCloseable {
             String stored = mapper.selectSnapshotJson(symbol);
             if (stored != null) {
                 var runtime = json.readTree(stored).get("_runtime");
-                if (runtime != null && !runtime.isNull()) restoreAudit(symbol, runtime.toString(), at, model);
+                if (runtime != null && !runtime.isNull()) restoreAudit(symbol, runtime.toString(), at, model, true);
             }
             var history = mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.INFERENCE, at.minusSeconds(900), at, at, 32);
             if (history != null) for (var audit : history) restoreAudit(symbol, audit.payloadJson(), at, model);
@@ -552,8 +593,13 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void restoreAudit(String symbol, String stored, Instant at, AssetCardModelBundle model) throws JsonProcessingException {
+        restoreAudit(symbol, stored, at, model, false);
+    }
+
+    private void restoreAudit(String symbol, String stored, Instant at, AssetCardModelBundle model, boolean committedSnapshot) throws JsonProcessingException {
         var node = json.readTree(stored);
         if (!"LIVE_OBSERVED_CARD_INPUTS".equals(node.path("dataKind").asText())) return;
+        if (node.path("publicationRequiresSnapshot").asBoolean(false) && !committedSnapshot) return;
         var frame = json.treeToValue(node.path("frame"), AssetCardFeatureService.Frame.class);
         var state = json.treeToValue(node.path("state"), AssetCardSignalService.State.class);
         if (frame == null || state == null || !symbol.equals(frame.symbol()) || !symbol.equals(state.symbol())

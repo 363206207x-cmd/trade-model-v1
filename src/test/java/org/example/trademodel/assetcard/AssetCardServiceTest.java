@@ -682,19 +682,42 @@ class AssetCardServiceTest {
             properties.setBarRetention(java.time.Duration.ofDays(1)); properties.setFeatureRetention(java.time.Duration.ofDays(1));
             properties.setTradeRetention(java.time.Duration.ofDays(1)); properties.setLabelRetention(java.time.Duration.ofDays(1));
             var cardMapper=spy(fixture.mapper);
+            var secondEntered = new java.util.concurrent.CountDownLatch(1);
+            var releaseSecond = new java.util.concurrent.CountDownLatch(1);
+            var committed = new java.util.concurrent.CountDownLatch(2);
+            var labelCalls = new java.util.concurrent.atomic.AtomicInteger();
+            doAnswer(call -> {
+                if (labelCalls.incrementAndGet() == 2) {
+                    secondEntered.countDown();
+                    assertThat(releaseSecond.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                }
+                Object result = call.callRealMethod();
+                committed.countDown(); // JDBC has returned; Mockito's invocation-entry count is not this boundary.
+                return result;
+            }).when(cardMapper).saveLabel(anyString(),any(),anyString(),anyString(),anyLong(),anyString(),anyString(),anyString(),any(),anyString());
             doReturn(new org.example.trademodel.mapper.AssetCardMapper.WriterReadiness(true,true,"ISOLATED_FIXTURE_ONLY"))
                     .when(cardMapper).inspectWriterPermissions();
             var market=mock(AssetCardMarketDataService.class);
             var pool=mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
             var events=mock(org.example.trademodel.v41.DashboardLiveEventService.class);
             try(var service=new AssetCardService(properties,market,cardMapper,pool,events,fixture.json)) {
+                try {
                 service.start(); service.start();
+                assertThat(secondEntered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
                 verify(cardMapper,timeout(5000).times(2)).saveLabel(eq("BTCUSDT"),eq(fixture.start),anyString(),anyString(),eq(8001L),
                         eq(AssetCardFeatureService.FEATURE_VERSION),eq(AssetCardService.LabelPipeline.LABEL_DEFINITION),anyString(),any(),anyString());
+                assertThat(committed.getCount()).isEqualTo(1);
+                assertThat(fixture.labels()).as("Invocation entry is not the second JDBC commit").hasSize(1);
+                releaseSecond.countDown();
+                assertThat(committed.await(5, java.util.concurrent.TimeUnit.SECONDS)).as("Both actual JDBC writes completed").isTrue();
                 assertThat(fixture.labels()).hasSize(2);
+                var sides = new java.util.HashSet<String>();
+                for (var row : fixture.labels()) sides.add(fixture.json.readTree(row.payloadJson()).path("label").path("side").asText());
+                assertThat(sides).containsExactlyInAnyOrder("LONG", "SHORT");
                 verify(cardMapper,never()).saveInference(anyString(),any(),any(),anyString());
                 verifyNoInteractions(events);
                 verify(market,never()).quote(anyString(),any());
+                } finally { releaseSecond.countDown(); }
             }
         }
     }
@@ -1838,6 +1861,100 @@ class AssetCardServiceTest {
     }
 
     @Test
+    void firstInferenceWriteCrossingPublicationDeadlineKeepsEvidenceWithoutRuntimePublication() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z"), at = close.plusSeconds(14);
+        try (var fixture = new RuntimeFixture()) {
+            fixture.freshMarket();
+            when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24)))
+                    .thenAnswer(call -> closedBars(call.getArgument(1), close));
+            var encoded = new java.util.concurrent.atomic.AtomicReference<String>();
+            var writeDuration = new java.util.concurrent.atomic.AtomicLong();
+            when(fixture.mapper.saveInference(eq("BTCUSDT"), eq(close), any(), anyString())).thenAnswer(call -> {
+                encoded.set(call.getArgument(3));
+                long began = System.nanoTime();
+                // A real bounded wait models a synchronous JDBC return that crosses the remaining one-second budget.
+                assertThat(new java.util.concurrent.CountDownLatch(1).await(1200, java.util.concurrent.TimeUnit.MILLISECONDS)).isFalse();
+                writeDuration.set(System.nanoTime() - began);
+                return 1;
+            });
+            fixture.service.inferClosedBar("BTCUSDT", close, at);
+            assertThat(writeDuration.get()).isGreaterThanOrEqualTo(java.util.concurrent.TimeUnit.SECONDS.toNanos(1));
+            var audit = fixture.json.readTree(encoded.get());
+            org.junit.jupiter.api.Assertions.assertAll(
+                    () -> assertThat(audit.path("publicationRequiresSnapshot").asBoolean()).isTrue(),
+                    () -> assertThat(audit.path("outcome").asText()).isEqualTo("COMPLETED"),
+                    () -> assertThat(audit.path("dataKind").asText()).isEqualTo("LIVE_OBSERVED_CARD_INPUTS"),
+                    () -> assertThat(fixture.json.treeToValue(audit.get("completedAt"), Instant.class)).isBefore(close.plusSeconds(15)),
+                    () -> assertThat(audit.path("rawFrame").isObject()).isTrue(),
+                    () -> assertThat(audit.path("frame").isObject()).isTrue(),
+                    () -> assertThat(runtimeMap(fixture.service, "signalStates")).doesNotContainKey("BTCUSDT"),
+                    () -> assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT"),
+                    () -> assertThat(runtimeMap(fixture.service, "signalFrames")).doesNotContainKey("BTCUSDT"),
+                    () -> verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any()),
+                    () -> verifyNoInteractions(fixture.events, fixture.pool));
+            verify(fixture.mapper, times(1)).saveInference(eq("BTCUSDT"), eq(close), any(), anyString());
+        }
+    }
+
+    @Test
+    void flaggedStandaloneInferenceCannotRestoreAnUncommittedRuntimeAfterRestart() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z"), at = close.plusSeconds(5);
+        try (var fixture = new RuntimeFixture()) {
+            var frame = runtimeFrame(close);
+            var state = new AssetCardSignalService.State("BTCUSDT", null, null, 0, close,
+                    identity(AssetCardProperties.ModelMode.SHADOW, null), null,
+                    AssetCardSnapshot.Signal.unavailable("SHADOW", frame.signalAsOf()), null, "MODEL_UNAVAILABLE");
+            var original = fixture.audit(frame, state);
+            var audit = (com.fasterxml.jackson.databind.node.ObjectNode) fixture.json.readTree(original.payloadJson());
+            audit.put("publicationRequiresSnapshot", true);
+            var flagged = new org.example.trademodel.mapper.AssetCardMapper.TypedHistory(original.symbol(), original.recordKind(),
+                    original.recordKey(), original.signalAsOf(), original.availableAt(), fixture.json.writeValueAsString(audit));
+            when(fixture.mapper.selectHistory(eq("BTCUSDT"), eq(org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of(flagged));
+            fixture.service.recoverRuntimeState("BTCUSDT", at);
+            org.junit.jupiter.api.Assertions.assertAll(
+                    () -> assertThat(runtimeMap(fixture.service, "signalStates")).doesNotContainKey("BTCUSDT"),
+                    () -> assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT"),
+                    () -> assertThat(runtimeMap(fixture.service, "signalFrames")).doesNotContainKey("BTCUSDT"),
+                    () -> verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any()),
+                    () -> verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString()),
+                    () -> verifyNoInteractions(fixture.events, fixture.pool));
+        }
+    }
+
+    @Test
+    void flaggedInferenceWithCommittedMatchingSnapshotRuntimeStillRestoresAfterRestart() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z"), at = close.plusSeconds(5);
+        try (var fixture = new RuntimeFixture()) {
+            var frame = runtimeFrame(close);
+            var state = new AssetCardSignalService.State("BTCUSDT", null, null, 0, close,
+                    identity(AssetCardProperties.ModelMode.SHADOW, null), null,
+                    AssetCardSnapshot.Signal.unavailable("SHADOW", frame.signalAsOf()), null, "MODEL_UNAVAILABLE");
+            var original = fixture.audit(frame, state);
+            var audit = (com.fasterxml.jackson.databind.node.ObjectNode) fixture.json.readTree(original.payloadJson());
+            audit.put("publicationRequiresSnapshot", true);
+            var flagged = new org.example.trademodel.mapper.AssetCardMapper.TypedHistory(original.symbol(), original.recordKind(),
+                    original.recordKey(), original.signalAsOf(), original.availableAt(), fixture.json.writeValueAsString(audit));
+            fixture.seed(state.signal(), at);
+            com.fasterxml.jackson.databind.node.ObjectNode stored = fixture.json.valueToTree(fixture.lastSnapshot());
+            stored.set("_runtime", audit);
+            runtimeMap(fixture.service, "snapshots").clear(); // A fresh process reads the already committed snapshot, not in-memory success.
+            when(fixture.mapper.selectSnapshotJson("BTCUSDT")).thenReturn(fixture.json.writeValueAsString(stored));
+            when(fixture.mapper.selectHistory(eq("BTCUSDT"), eq(org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of(flagged));
+            fixture.service.recoverRuntimeState("BTCUSDT", at);
+            assertThat(AssetCardServiceTest.<AssetCardSignalService.State>runtimeMap(fixture.service, "signalStates").get("BTCUSDT")).isEqualTo(state);
+            assertThat(AssetCardServiceTest.<AssetCardFeatureService.Frame>runtimeMap(fixture.service, "featureFrames").get("BTCUSDT")).isEqualTo(frame);
+            assertThat(AssetCardServiceTest.<AssetCardFeatureService.Frame>runtimeMap(fixture.service, "signalFrames").get("BTCUSDT")).isEqualTo(frame);
+            assertThat(AssetCardServiceTest.<AssetCardSignalService.State>runtimeMap(fixture.service, "signalStates")
+                    .get("BTCUSDT").signal().calibratedConfidence()).isNull();
+            verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
+            verify(fixture.market, never()).bars(anyString(), anyString(), any(), anyInt());
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
     void persistedInferenceConflictRestoresTheWinningExactBarAndNeverPublishesTheLoser() throws Exception {
         Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
         try (var fixture = new RuntimeFixture()) {
@@ -2014,7 +2131,8 @@ class AssetCardServiceTest {
             assertThat(audit.path("outcome").asText()).isEqualTo("TIMED_OUT");
             assertThat(audit.path("dataKind").asText()).isEqualTo("LIVE_OBSERVED_CARD_OUTCOME");
             assertThat(audit.path("originalOutcome").asText()).isEqualTo("COMPLETED");
-            assertThat(audit.path("persistenceStatus").asText()).isEqualTo("AFTER_PUBLICATION_DEADLINE");
+            assertThat(audit.path("persistenceStatus").asText()).isEqualTo("RETRIED_WITHOUT_PUBLICATION");
+            assertThat(audit.path("timeoutBasis").asText()).isEqualTo("PUBLICATION_ABANDONED_AFTER_ADMISSION_REJECTION");
             assertThat(fixture.json.treeToValue(audit.get("completedAt"), Instant.class)).isBefore(close.plusSeconds(15));
             assertThat(fixture.json.treeToValue(audit.get("persistenceAttemptAt"), Instant.class)).isAfter(close.plusSeconds(15));
             assertThat(audit.path("rawFrame").isObject()).isTrue();
@@ -2022,6 +2140,86 @@ class AssetCardServiceTest {
             assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT");
             verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any());
             verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void deferredInferenceUsesSynchronousWriteReturnClockAndNeverClaimsTimelyPublication() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+        Instant writeAt = close.plusMillis(14900), deadline = close.plusSeconds(15);
+        for (String scenario : List.of("SLOW_INSERT", "FAST_INSERT", "EXISTING_WINNER", "WINNER_LOOKUP_EXCEPTION", "WRITE_EXCEPTION", "STOPPED")) {
+            Instant returnedAt = close.plusMillis("FAST_INSERT".equals(scenario) ? 14950 : 15100);
+            var clock = new java.util.concurrent.atomic.AtomicReference<>(writeAt);
+            var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AssetCardService.class);
+            var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+            appender.start(); logger.addAppender(appender);
+            try (var fixture = new RuntimeFixture()) {
+                var persistenceClock = mock(java.time.Clock.class);
+                when(persistenceClock.instant()).thenAnswer(call -> clock.get());
+                ReflectionTestUtils.setField(fixture.service, "persistenceClock", persistenceClock);
+                var scheduled = mock(java.util.concurrent.ScheduledExecutorService.class);
+                ReflectionTestUtils.setField(fixture.service, "inference", scheduled);
+                fixture.properties.setExternalCallsEnabled(true); fixture.enableLocalWorkers(); fixture.freshMarket();
+                when(fixture.market.persistenceAllowed(any())).thenReturn(true);
+                when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24)))
+                        .thenAnswer(call -> closedBars(call.getArgument(1), close));
+                var attempts = new java.util.concurrent.atomic.AtomicInteger();
+                when(fixture.market.persistCard(any(), any())).thenAnswer(call -> {
+                    if (attempts.getAndIncrement() == 0) return false;
+                    ((Runnable) call.getArgument(1)).run(); return true;
+                });
+                fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(3));
+                var retry = org.mockito.ArgumentCaptor.forClass(Runnable.class);
+                verify(scheduled).schedule(retry.capture(), anyLong(), eq(java.util.concurrent.TimeUnit.MILLISECONDS));
+                var encoded = new java.util.concurrent.atomic.AtomicReference<String>();
+                when(fixture.mapper.saveInference(eq("BTCUSDT"), eq(close), any(), anyString())).thenAnswer(call -> {
+                    assertThat(clock.get()).isEqualTo(writeAt);
+                    encoded.set(call.getArgument(3));
+                    clock.set(returnedAt); // The synchronous persistence call crosses the deadline before returning.
+                    if ("WRITE_EXCEPTION".equals(scenario)) throw new IllegalStateException("TEST_WRITE_RESULT_UNKNOWN");
+                    return Set.of("EXISTING_WINNER", "WINNER_LOOKUP_EXCEPTION").contains(scenario) ? 0 : 1;
+                });
+                var winner = new org.example.trademodel.mapper.AssetCardMapper.TypedHistory("BTCUSDT",
+                        org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE, "5m:" + close, close, writeAt,
+                        "{\"outcome\":\"TEST_EXISTING_WINNER\"}");
+                when(fixture.mapper.selectInference(eq("BTCUSDT"), eq(close), any())).thenReturn(Optional.of(winner));
+                if ("WINNER_LOOKUP_EXCEPTION".equals(scenario))
+                    when(fixture.mapper.selectInference(eq("BTCUSDT"), eq(close), any()))
+                            .thenThrow(new IllegalStateException("TEST_LOOKUP_DETAIL_MUST_NOT_BE_LOGGED"));
+                if ("STOPPED".equals(scenario)) when(fixture.market.persistenceAllowed(any())).thenReturn(false);
+                retry.getValue().run();
+                var returns = appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .filter(message -> message.startsWith("[asset-card] Inference persistence returned ")).toList();
+                if ("STOPPED".equals(scenario)) {
+                    verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
+                    assertThat(returns).isEmpty();
+                    verify(scheduled, times(1)).schedule(any(Runnable.class), anyLong(), any());
+                } else {
+                    var exactJson = fixture.json.copy().enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+                    var audit = exactJson.readTree(encoded.get());
+                    assertThat(audit.path("outcome").asText()).as(scenario).isEqualTo("TIMED_OUT");
+                    assertThat(audit.path("dataKind").asText()).isEqualTo("LIVE_OBSERVED_CARD_OUTCOME");
+                    assertThat(audit.path("timeoutBasis").asText()).isEqualTo("PUBLICATION_ABANDONED_AFTER_ADMISSION_REJECTION");
+                    assertThat(audit.path("persistenceStatus").asText()).isEqualTo("RETRIED_WITHOUT_PUBLICATION");
+                    assertThat(exactJson.treeToValue(audit.get("completedAt"), Instant.class)).isBefore(writeAt);
+                    assertThat(exactJson.treeToValue(audit.get("persistenceAttemptAt"), Instant.class)).isEqualTo(writeAt);
+                    assertThat(audit.has("persistenceReturnedAt")).as("An immutable pre-write row must not invent its future return time").isFalse();
+                    String result = "WRITE_EXCEPTION".equals(scenario) ? "UNKNOWN"
+                            : "WINNER_LOOKUP_EXCEPTION".equals(scenario) ? "WINNER_UNKNOWN"
+                            : "EXISTING_WINNER".equals(scenario) ? "EXISTING_WINNER" : "INSERTED";
+                    assertThat(returns).singleElement().satisfies(message -> assertThat(message)
+                            .contains("symbol=BTCUSDT", "closed5mAt=" + close, "attempt=2", "writeAt=" + writeAt,
+                                    "returnedAt=" + returnedAt, "deadline=" + deadline,
+                                    "returnedAfterDeadline=" + returnedAt.isAfter(deadline), "result=" + result)
+                            .doesNotContain("TEST_WRITE_RESULT_UNKNOWN", "TEST_LOOKUP_DETAIL_MUST_NOT_BE_LOGGED", "rawFrame", "password"));
+                    verify(scheduled, times(Set.of("WRITE_EXCEPTION", "WINNER_LOOKUP_EXCEPTION").contains(scenario) ? 2 : 1))
+                            .schedule(any(Runnable.class), anyLong(), any());
+                }
+                assertThat(runtimeMap(fixture.service, "signalStates")).doesNotContainKey("BTCUSDT");
+                assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT");
+                verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any());
+                verifyNoInteractions(fixture.events, fixture.pool);
+            } finally { logger.detachAppender(appender); appender.stop(); }
         }
     }
 

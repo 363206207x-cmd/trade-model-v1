@@ -119,6 +119,79 @@ not claimed as durable or automatically replayable after restart. The original
 persisted bars and observations are not deleted. No server or new-window action
 was performed for these local regressions.
 
+### Second candidate and exact-head review follow-up
+
+Candidate `1a65ece1bf6a6c6cbad804267b446119e543057b` used another new,
+initially target-free checkout. Full Maven ran 5,597 tests with zero failures,
+zero errors and the same fourteen explicit local skips. Python ran 49 tests;
+the frontend matrix passed. The standard JAR embedded that exact clean identity
+and had SHA-256 `3909c567a939bcb0314ff7b67690772aee353a7e01bb6fb7754f2fcb049d0a0c`.
+Its fifteen extracted-JAR loopback cases, fourteen additional provenance/real
+isolated credential cases, and Linux x86_64 LONG/SHORT raw/Beta interop passed.
+This is candidate/local evidence only, not a merged-main or deployed artifact.
+
+Exact-head workflow-contract run 34696494193 and push quality run 34696492068
+passed. PR quality run 34696494177 failed one of 1,601 tests: the scheduled-label
+test waited for Mockito's second method-entry notification, then queried before
+the second real SQL call completed. A controlled latch reproduced exactly one
+committed LONG label at that instant. The correction retains the original
+two-call and two-label assertions, waits for both real calls to return, and
+additionally checks distinct LONG/SHORT labels. It does not change production
+scheduling or replace the actual database operations with a success stub.
+Both quality jobs executed all fourteen dedicated-writer/ACL cases without skips.
+Their two remaining skips lacked the fixed-Python and rollback-JAR opt-ins,
+which were executed separately in the local candidate verification.
+
+The exact-head review then reported `V42-INFERENCE-RETRY-COMMIT-DEADLINE`:
+the deferred write classified its result using the time before synchronous SQL,
+so a write entering at +14.9 seconds could return after +15 seconds without an
+explicit timeout classification. That candidate remains Draft and unmerged.
+The correction must distinguish abandonment of timely publication from observed
+database-return timing, retain immutable original evidence, and measure the
+return only after the synchronous mapper call. No existing history row, table,
+permission or deadline is to be rewritten. Post-correction results require a
+new candidate and cannot reuse these checks as a passing final-head result.
+
+The deferred-write regression reproduced the +14.9s entry/+15.1s return case:
+the old classification was PERSISTENCE_DELAYED. The correction preserves the
+original calculation and classifies abandoned publication as OUTCOME/TIMED_OUT
+with an explicit abandonment basis. It never predicts a future commit time in
+an immutable pre-write row. After the synchronous mapper returns, bounded
+structured evidence records its observed return time, deadline and insertion,
+existing-winner or unknown result. That is not the database's internal commit
+timestamp. If those logs are unavailable, actual return timing is UNKNOWN; it
+cannot be reconstructed from persistenceAttemptAt. The private clock uses UTC
+in production and adds no API, environment setting or dependency. A controlled
+test clock is necessary because this repository's existing mock maker does not
+support static Instant mocks; that initial test-setup error is not a behavior RED.
+No new history receipt, database permission or post-write history UPDATE is used.
+
+The same review also identified a pre-existing first-write timing gap. Closing
+it must not claim that a pre-write COMPLETED calculation proves timely database
+publication. New inference evidence requires a successful snapshot for runtime
+recovery; an audit without that snapshot remains private, with its original
+training inputs retained. This deliberately fails closed if a snapshot failed
+and the process restarted, rather than restoring an unconfirmed publication.
+Legacy unmarked evidence is not rewritten. Tests of these deadline branches do
+not by themselves prove end-to-end production/SSE publication latency, which
+still needs actual runtime evidence. Model readiness remains NO.
+
+Post-correction WIP validation ran 471 focused tests with zero failures/errors
+and one local LinuxKit ACL skip, plus Python 49 and the frontend matrix. A prior
+whole-service command without the required Docker connection reported three
+environment errors; the corrected isolated PostgreSQL run executed those cases,
+not skipped them. The first-write/history RED had two assertion failures and
+zero errors; its committed-snapshot positive control passed. The subsequent
+focused run passed all three new cases, all deferred-return scenarios, the
+strengthened scheduled-label test and every retained card contract assertion.
+Product Source, task validation, 101 exact-machine scenarios and full
+workflow-contract passed; syntax/diff and the unchanged 64-path fingerprint
+passed. The real outer resolver recognized V42/#1302 and correctly blocked the
+dirty worktree pending an ordinary candidate commit. A clean, synchronized
+candidate must be checked again; no output or permission was overridden.
+Read-only source review found no remaining P1/P2 in this correction. These WIP
+checks are not the next candidate's full-suite, remote CI or deployment result.
+
 ## V42 stream recovery and stale-price correction — 2026-09-12
 
 This is the same V42 card-only task, not a new model or algorithm. The business
