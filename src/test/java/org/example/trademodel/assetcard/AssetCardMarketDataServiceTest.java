@@ -579,6 +579,220 @@ class AssetCardMarketDataServiceTest {
         assertThat(lease.check(NOW)).as(lease.status()).isTrue();
     }
 
+    @Test void stoppedWindowRejectsClosedBarReplayWithoutRefreshingItsLedger() throws Exception {
+        configureWindowFixture();
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        List<AssetCardMarketDataService.MarketUpdate> events = new ArrayList<>();
+        service.addListener(events::add);
+        service.stopCollection("OPERATOR_STOPPED_CARD_WINDOW", NOW.plusSeconds(1));
+        byte[] stoppedLedger = java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"));
+        clearInvocations(mapper);
+        service.acceptMessage(kline(true), NOW.plusSeconds(2));
+        verifyNoInteractions(mapper);
+        assertThat(events).noneMatch(event -> event.type().equals("BAR"));
+        assertThat(java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"))).isEqualTo(stoppedLedger);
+        assertThat(service.collectionStatus()).isEqualTo("OPERATOR_STOPPED_CARD_WINDOW");
+    }
+
+    @Test void persistenceSlotsAllowBoundedParallelIoButStopRejectsQueuedAndFutureWrites() throws Exception {
+        configureWindowFixture();
+        properties.getWriter().setMaximumPoolSize(2);
+        Object lease = org.springframework.test.util.ReflectionTestUtils.getField(service, "collectionLease");
+        var workers = java.util.concurrent.Executors.newFixedThreadPool(3);
+        var entered = new java.util.concurrent.CountDownLatch(2);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var unexpected = new java.util.concurrent.atomic.AtomicInteger();
+        Runnable io = () -> {
+            assertThat(Thread.holdsLock(service)).isFalse();
+            assertThat(Thread.holdsLock(lease)).isFalse();
+            entered.countDown();
+            try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+        };
+        try {
+            var first = workers.submit(() -> persist(NOW, io));
+            var second = workers.submit(() -> persist(NOW, io));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(persistenceCount("persistenceInFlight")).isEqualTo(2);
+            var queued = workers.submit(() -> persist(NOW, unexpected::incrementAndGet));
+            await(() -> persistenceCount("persistenceWaiting") == 1);
+            service.stopCollection("OPERATOR_STOPPED_CARD_WINDOW", NOW.plusSeconds(1));
+            byte[] stoppedLedger = java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"));
+            assertThat(queued.get(1, java.util.concurrent.TimeUnit.SECONDS)).isFalse();
+            assertThat(persist(NOW.plusSeconds(2), unexpected::incrementAndGet)).isFalse();
+            assertThat(persistenceCount("persistenceInFlight")).isEqualTo(2);
+            release.countDown();
+            assertThat(first.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(second.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(persistenceCount("persistenceInFlight")).isZero();
+            assertThat(persistenceCount("persistenceWaiting")).isZero();
+            assertThat(persistenceCount("persistenceCompleted")).isEqualTo(2);
+            assertThat(persistenceCount("persistenceRejected")).isEqualTo(2);
+            assertThat(unexpected).hasValue(0);
+            assertThat(java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"))).isEqualTo(stoppedLedger);
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void persistenceSlotTimeoutAndFailureReleaseDoNotExtendLeaseOrSwallowIoFailure() throws Exception {
+        configureWindowFixture();
+        properties.getWriter().setMaximumPoolSize(1);
+        properties.getWriter().setConnectionTimeout(Duration.ofMillis(250));
+        var workers = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var unexpected = new java.util.concurrent.atomic.AtomicInteger();
+        byte[] originalLedger = java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"));
+        try {
+            var first = workers.submit(() -> persist(NOW, () -> {
+                entered.countDown();
+                try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            long started = System.nanoTime();
+            assertThat(persist(NOW, unexpected::incrementAndGet)).isFalse();
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofMillis(200), Duration.ofSeconds(2));
+            release.countDown(); assertThat(first.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(persistenceCount("persistenceInFlight")).isZero();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> persist(NOW, () -> {
+                throw new IllegalStateException("ISOLATED_CARD_IO_FAILURE");
+            })).isInstanceOf(IllegalStateException.class).hasMessage("ISOLATED_CARD_IO_FAILURE");
+            assertThat(persistenceCount("persistenceInFlight")).isZero();
+            assertThat(persistenceCount("persistenceCompleted")).isEqualTo(2);
+            assertThat(persist(NOW.plus(Duration.ofHours(8)), unexpected::incrementAndGet)).isFalse();
+            assertThat(unexpected).hasValue(0);
+            assertThat(java.nio.file.Files.readAllBytes(windowDirectory.resolve("isolated-window.json"))).isEqualTo(originalLedger);
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void queuedClosedBarRechecksEpochAfterPersistenceSlotBecomesAvailable() throws Exception {
+        properties.getWriter().setMaximumPoolSize(1);
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 1L);
+        var workers = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var occupied = workers.submit(() -> persist(NOW, () -> {
+                entered.countDown();
+                try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "enqueueMessage", kline(true), NOW, 1L);
+            await(() -> persistenceCount("persistenceWaiting") == 1);
+            synchronized (service) { org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L); }
+            release.countDown(); assertThat(occupied.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+            verify(mapper, never()).upsertClosedBar(any());
+            assertThat(persistenceCount("persistenceInFlight")).isZero();
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void livePersistenceSlotTimeoutReportsBarFailureInsteadOfSilentlyDroppingClosedBoundary() throws Exception {
+        properties.getWriter().setMaximumPoolSize(1);
+        properties.getWriter().setConnectionTimeout(Duration.ofMillis(250));
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        List<AssetCardMarketDataService.MarketUpdate> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        service.addListener(events::add);
+        var workers = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var occupied = workers.submit(() -> persist(NOW, () -> {
+                entered.countDown();
+                try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            service.acceptMessage(kline(true), NOW);
+            assertThat(events).extracting(AssetCardMarketDataService.MarketUpdate::type).containsExactly("PERSISTENCE_FAILURE", "BAR");
+            verify(mapper, never()).upsertClosedBar(any());
+            release.countDown(); assertThat(occupied.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void closeWaitsForAdmittedIoBeforeRecordingCleanShutdown() throws Exception {
+        configureLoopback(null);
+        var lease = (AssetCardMarketDataService.CollectionLease)org.springframework.test.util.ReflectionTestUtils.getField(service, "collectionLease");
+        assertThat(lease.check(Instant.now())).isTrue();
+        var workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var writing = workers.submit(() -> persist(Instant.now(), () -> {
+                entered.countDown();
+                try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var closing = workers.submit(service::close);
+            await(() -> Boolean.TRUE.equals(org.springframework.test.util.ReflectionTestUtils.getField(service, "stopped")));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> closing.get(100, java.util.concurrent.TimeUnit.MILLISECONDS))
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+            assertThat(ledger().path("cleanShutdown").asBoolean()).isFalse();
+            assertThat(persist(Instant.now(), () -> { throw new AssertionError("No post-close write"); })).isFalse();
+            release.countDown(); assertThat(writing.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            closing.get(1, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(ledger().path("cleanShutdown").asBoolean()).isTrue();
+            assertThat(persistenceCount("persistenceInFlight")).isZero();
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void closeDrainTimeoutPersistsStopAndDoesNotGrantRestartAContinuation() throws Exception {
+        configureLoopback(null); properties.getWriter().setConnectionTimeout(Duration.ofMillis(250));
+        var lease = (AssetCardMarketDataService.CollectionLease)org.springframework.test.util.ReflectionTestUtils.getField(service, "collectionLease");
+        assertThat(lease.check(Instant.now())).isTrue();
+        var workers = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var writing = workers.submit(() -> persist(Instant.now(), () -> {
+                entered.countDown();
+                try { assertThat(release.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            long start = System.nanoTime(); service.close();
+            assertThat(Duration.ofNanos(System.nanoTime() - start)).isBetween(Duration.ofMillis(200), Duration.ofSeconds(2));
+            assertThat(ledger().path("state").asText()).isEqualTo("STOPPED");
+            assertThat(ledger().path("reason").asText()).isEqualTo("PERSISTENCE_DRAIN_TIMEOUT");
+            assertThat(ledger().path("cleanShutdown").asBoolean()).isFalse();
+            var restarted = new AssetCardMarketDataService.CollectionLease(properties.getCollectionWindow(), new ObjectMapper(), mapper::storageUsage);
+            assertThat(restarted.check(Instant.now())).isFalse();
+            assertThat(restarted.status()).isEqualTo("PERSISTENCE_DRAIN_TIMEOUT");
+            release.countDown(); assertThat(writing.get(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(persistenceCount("persistenceCompleted")).isEqualTo(1);
+        } finally {
+            release.countDown(); workers.shutdownNow();
+            assertThat(workers.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private boolean persist(Instant at, Runnable action) {
+        return Boolean.TRUE.equals(org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "persistCard", at, action));
+    }
+
+    private long persistenceCount(String method) {
+        Number value = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, method);
+        return value.longValue();
+    }
+
     @Test void absoluteEightHourWindowExpiresAcrossRestartAndCannotBeRebased() throws Exception {
         configureWindowFixture();
         var window=properties.getCollectionWindow();
@@ -746,6 +960,46 @@ class AssetCardMarketDataServiceTest {
         window.setMinimumFreeBytes(1);
         when(mapper.storageUsage()).thenReturn(new AssetCardMapper.StorageUsage(0,0,0,100,100,true));
         return window;
+    }
+
+    @Test void loopbackRuntimeEvidenceIsBoundedAndNeverInventsReceivedFrameTimes() throws Exception {
+        var logger = (ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(AssetCardMarketDataService.class);
+        var captured = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        captured.start(); logger.addAppender(captured);
+        try (var server = new LoopbackSpotServer(101, false)) {
+            configureLoopback(server); service.ensureConnected(); var peer = server.next();
+            await(() -> currentSocket() != null);
+            service.ensureConnected();
+            List<String> initial = runtimeLines(captured);
+            assertThat(initial).isNotEmpty();
+            assertThat(initial.get(initial.size() - 1)).contains("lastReceivedFrameAt=null", "lastReceivedMarketAt=null");
+            for (int i = 0; i < 12; i++) service.ensureConnected();
+            assertThat(runtimeLines(captured)).hasSize(initial.size());
+            peer.text(trade("btcusdt@aggTrade", "BTCUSDT", 901, "100", Instant.now().minusMillis(5)));
+            await(() -> service.quote("BTCUSDT", Instant.now()).isPresent());
+            org.springframework.test.util.ReflectionTestUtils.setField(service, "lastRuntimeLogAt", Instant.now().minusSeconds(61));
+            service.ensureConnected();
+            List<String> active = runtimeLines(captured);
+            assertThat(active).hasSize(initial.size() + 1);
+            String latest = active.get(active.size() - 1);
+            assertThat(latest).contains("utc=", "epoch=", "attempt=", "queues=", "drops=", "reconnects=",
+                    "lease=RUNNING", "persistenceInFlight=0", "persistenceCompleted=0");
+            assertThat(latest).doesNotContain("lastReceivedFrameAt=null", "lastReceivedMarketAt=null",
+                    "ws://", "wss://", "http://", "https://", windowDirectory.toString(), "BTCUSDT", "aggTrade");
+            service.stopCollection("OPERATOR_STOPPED_CARD_WINDOW", Instant.now());
+            service.ensureConnected();
+            List<String> terminal = runtimeLines(captured);
+            assertThat(terminal).hasSize(active.size() + 1);
+            assertThat(terminal.get(terminal.size() - 1)).contains("lease=OPERATOR_STOPPED_CARD_WINDOW");
+            for (int i = 0; i < 12; i++) service.ensureConnected();
+            assertThat(runtimeLines(captured)).hasSize(terminal.size());
+            assertThat(server.connections).hasValue(1);
+        } finally { logger.detachAppender(captured); captured.stop(); }
+    }
+
+    private static List<String> runtimeLines(ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> captured) {
+        return captured.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                .filter(message -> message.startsWith("[asset-card] Spot runtime ")).toList();
     }
 
     @Test void loopbackExpiredCheckAbortsExplicitlyAndRecoversWithoutResettingAllowance() throws Exception {
@@ -1103,6 +1357,7 @@ class AssetCardMarketDataServiceTest {
         }
         System.out.println("STANDARD_JAR_SHA256=" + java.util.HexFormat.of().formatHex(digest.digest()));
         for (String scenario : List.of(
+                "loopbackRuntimeEvidenceIsBoundedAndNeverInventsReceivedFrameTimes",
                 "loopbackExpiredCheckAbortsExplicitlyAndRecoversWithoutResettingAllowance",
                 "loopbackSilentConnectionRetiresButPingAndOtherAssetTrafficKeepItAlive",
                 "loopbackMalformedAndUnsubscribedFramesCannotRenewMarketLiveness",

@@ -91,6 +91,27 @@ public class AssetCardService implements AutoCloseable {
     private String failure(Field field, String symbol) { return fieldFailures.get(field).get(symbol); }
     private static String riskVersion(AssetCardModelBundle model) { return model.riskVersion() == null ? AssetCardRiskService.RULE_VERSION : model.riskVersion(); }
 
+    /** Local, non-network pipeline tests/exports are independent; every configured collection uses its original lease. */
+    private boolean controlledPersistence() {
+        return properties.isExternalCallsEnabled() || properties.getCollectionWindow().getId() != null;
+    }
+
+    private boolean persistenceAllowed() {
+        return !controlledPersistence() || market.persistenceAllowed(Instant.now());
+    }
+
+    private boolean persistCard(Runnable action) {
+        if (!controlledPersistence()) { action.run(); return true; }
+        return market.persistCard(Instant.now(), action);
+    }
+
+    private boolean persistCard(String symbol, Runnable action) {
+        boolean accepted = persistCard(action);
+        if (accepted) healthy(Field.PERSISTENCE, symbol);
+        else if (persistenceAllowed()) failed(Field.PERSISTENCE, symbol, "卡片写入暂时繁忙，本轮持久化待处理");
+        return accepted;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public void setEvidenceService(AssetCardEvidenceService evidence) { this.evidence = evidence; }
 
@@ -117,10 +138,11 @@ public class AssetCardService implements AutoCloseable {
 
     /** Only this background owner writes labels; Home/SSE reads never call it. Missing evidence is retried, not fabricated. */
     void matureLabels(Instant at) {
-        if (!started || !properties.isEnabled() || !writerReady) return;
+        if (!started || !properties.isEnabled() || !writerReady || !persistenceAllowed()) return;
         try {
             var pipeline = new LabelPipeline(mapper, json, properties.getArchiveDirectory());
             for (String symbol : mapper.selectInferenceSymbols()) {
+                if (!persistenceAllowed()) return;
                 try {
                     var cursor = labelCursors.get(symbol);
                     var rows = mapper.selectHistoryPage(symbol, AssetCardMapper.HistoryKind.INFERENCE, Instant.EPOCH,
@@ -128,9 +150,12 @@ public class AssetCardService implements AutoCloseable {
                             cursor == null ? null : cursor.recordKey(), properties.getLabelMaturityBatchSize());
                     if (rows.isEmpty()) { labelCursors.remove(symbol); continue; }
                     for (var row : rows) {
+                        if (!persistenceAllowed()) { labelStatuses.put(symbol, "PENDING_COLLECTION_STOPPED"); return; }
                         var outcome = pipeline.materialize(row, at);
+                        if (outcome.record() != null && !pipeline.save(row, outcome, action -> persistCard(symbol, action))) {
+                            labelStatuses.put(symbol, persistenceAllowed() ? "PENDING_PERSISTENCE_CAPACITY" : "PENDING_COLLECTION_STOPPED"); return;
+                        }
                         labelStatuses.put(symbol, outcome.status());
-                        if (outcome.record() != null) pipeline.save(row, outcome);
                         labelCursors.put(symbol, row);
                     }
                 } catch (RuntimeException failure) {
@@ -151,17 +176,21 @@ public class AssetCardService implements AutoCloseable {
                 .export(normalize(symbol), from, to, cutoff, properties.getTrainingExportDirectory());
     }
 
-    /** Bounded archive-before-delete work, independent of Home and of network-window expiry. */
+    /** Background archive-before-delete work; a configured terminal collection defers it without removing evidence. */
     void retainHistory(Instant at) {
-        if (!started || !properties.isEnabled() || !writerReady || !properties.isRetentionEnabled()) return;
+        if (!started || !properties.isEnabled() || !writerReady || !properties.isRetentionEnabled() || !persistenceAllowed()) return;
         try {
-            var retention = new RetentionLifecycle(mapper, json, properties.getArchiveDirectory(), properties.getArchiveMinimumFreeBytes());
+            var retention = new RetentionLifecycle(mapper, json, properties.getArchiveDirectory(), properties.getArchiveMinimumFreeBytes(), this::persistenceAllowed);
             var window = properties.getCollectionWindow();
             Instant protectedFrom = window.valid() && at.isBefore(window.getEndsAt()) && !at.isBefore(window.getStartsAt())
                     ? Instant.EPOCH : at; // Do not offset the finite-window growth budget with concurrent deletion.
             for (String symbol : mapper.selectRetentionSymbols()) {
-                var result = retention.run(symbol, at, properties.getBarRetention(), properties.getFeatureRetention(),
-                        properties.getTradeRetention(), properties.getLabelRetention(), properties.getRetentionBatchSize(), protectedFrom);
+                var resultHolder = new RetentionLifecycle.Result[1];
+                // One bounded archive/delete transaction is in flight; each delete rechecks the terminal state.
+                if (!persistCard(symbol, () -> resultHolder[0] = retention.run(symbol, at, properties.getBarRetention(), properties.getFeatureRetention(),
+                        properties.getTradeRetention(), properties.getLabelRetention(), properties.getRetentionBatchSize(), protectedFrom))) return;
+                var result = resultHolder[0];
+                if ("PENDING_COLLECTION_STOPPED".equals(result.status())) return;
                 if (!Set.of("ARCHIVED_VERIFIED_AND_PRUNED", "NOTHING_EXPIRED", "PENDING_LABEL_DEPENDENCIES_PRESERVED").contains(result.status())) {
                     failed(Field.PERSISTENCE, symbol, result.status());
                     market.stopCollection("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE", at);
@@ -209,12 +238,14 @@ public class AssetCardService implements AutoCloseable {
         if (!writerReady) return;
         if (properties.isExternalCallsEnabled() && !market.collectionAccepting(Instant.now())) { pendingTrades.clear(); return; }
         pendingTrades.forEach((symbol, quote) -> {
+            if (!persistenceAllowed()) return;
             if (!pendingTrades.remove(symbol, quote)) return;
             try {
                 var observation = tradeObservation(quote);
-                mapper.saveTradeObservation(quote, observation.instrument(), observation.sourceVersion(), json.writeValueAsString(
+                String encoded = json.writeValueAsString(
                         payload("observation", observation, "quantity", quote.quantity(), "sampling", "LATEST_ACTUAL_AGG_TRADE_PER_ONE_SECOND_FLUSH",
-                                "dataKind", "LIVE_OBSERVED_CARD_TRADE")));
+                                "dataKind", "LIVE_OBSERVED_CARD_TRADE"));
+                persistCard(symbol, () -> mapper.saveTradeObservation(quote, observation.instrument(), observation.sourceVersion(), encoded));
             } catch (RuntimeException | JsonProcessingException failure) {
                 failed(Field.PERSISTENCE, symbol, "真实成交观察保存失败，标签不得补造");
             }
@@ -278,6 +309,11 @@ public class AssetCardService implements AutoCloseable {
 
     private void inferClosedBarLocked(String symbol, Instant closedAt, Instant at) {
         if (!properties.isEnabled() || closedAt == null || closedAt.isAfter(at)) return;
+        if (!persistenceAllowed()) {
+            // This worker is no longer queued. Its immutable bar/evidence remains pending, never a fabricated failed audit.
+            queuedBars.remove(new BarIdentity(symbol, closedAt));
+            return;
+        }
         if (started && !writerReady) { failed(Field.PERSISTENCE, symbol, "闭线持久化写入权限未就绪"); return; }
         long startedNanos = System.nanoTime();
         var identity = new BarIdentity(symbol, closedAt);
@@ -342,7 +378,10 @@ public class AssetCardService implements AutoCloseable {
                         "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS",
                         "trainingEligible", frame.trainingEligible(), "trainingQualificationReasons", frame.trainingQualificationReasons(),
                         "providerEvidenceMissingReasons", providerSnapshot == null ? List.of("COINGLASS_NOT_YET_OBSERVED") : providerSnapshot.missingReasons());
-                if (mapper.saveInference(symbol, closedAt, completedAt, json.writeValueAsString(audit)) != 1) {
+                String encoded = json.writeValueAsString(audit);
+                int[] saved = {0};
+                if (!persistCard(symbol, () -> saved[0] = mapper.saveInference(symbol, closedAt, completedAt, encoded))) return;
+                if (saved[0] != 1) {
                     mapper.selectInference(symbol, closedAt, completedAt).ifPresent(existing -> {
                         try { restoreAudit(symbol, existing.payloadJson(), completedAt, model); }
                         catch (JsonProcessingException invalid) { throw new IllegalStateException("INVALID_CARD_AUDIT", invalid); }
@@ -357,6 +396,7 @@ public class AssetCardService implements AutoCloseable {
                 healthy(Field.SIGNAL, symbol);
             }
         } catch (RuntimeException | JsonProcessingException failure) {
+            if (!persistenceAllowed()) return;
             failed(Field.SIGNAL, symbol, "卡片分析暂时不可用");
             log.warn("[asset-card] Closed-bar analysis failed ({})", failure.getClass().getSimpleName());
             try { recordClosedFailure(symbol, closedAt, at, "FAILED"); }
@@ -367,11 +407,13 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void recordClosedFailure(String symbol, Instant closedAt, Instant at, String outcome) {
+        if (!persistenceAllowed()) return;
         failed(Field.SIGNAL, symbol, "TIMED_OUT".equals(outcome) ? "本轮闭线计算超过15秒，等待下一闭线" : "本轮闭线数据或计算未完成");
         try {
-            mapper.saveInference(symbol, closedAt, at, json.writeValueAsString(payload("closed5mAt", closedAt,
+            String encoded = json.writeValueAsString(payload("closed5mAt", closedAt,
                     "completedAt", at, "outcome", outcome, "modelMode", properties.getModelMode(),
-                    "dataKind", "LIVE_OBSERVED_CARD_OUTCOME")));
+                    "dataKind", "LIVE_OBSERVED_CARD_OUTCOME"));
+            persistCard(symbol, () -> mapper.saveInference(symbol, closedAt, at, encoded));
         } catch (JsonProcessingException invalid) { throw new IllegalStateException("CARD_OUTCOME_SERIALIZATION_FAILED", invalid); }
     }
 
@@ -531,7 +573,7 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void enqueueRiskRefreshes() {
-        if (!properties.isEnabled()) return;
+        if (!properties.isEnabled() || !persistenceAllowed()) return;
         for (String symbol : market.subscribedSymbols()) if (pendingRiskRefreshes.add(symbol)) {
             riskWorkers.execute(() -> {
                 try { refreshRisk(symbol, Instant.now()); }
@@ -548,7 +590,7 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void refreshRiskLocked(String symbol, Instant at, AssetCardModelBundle model) {
-        if (!properties.isEnabled() || started && !writerReady) return;
+        if (!properties.isEnabled() || started && !writerReady || !persistenceAllowed()) return;
         recoverRuntimeState(symbol, at, model);
         var current = loadSnapshot(symbol, symbol);
         var frame = featureFrames.get(symbol);
@@ -642,10 +684,11 @@ public class AssetCardService implements AutoCloseable {
         if (!signalChanged && !riskChanged) return;
         if (!riskChanged) risk = current.risk();
         Instant clock = sameEffectiveSignal(signal,current.signal()) && sameEffectiveRisk(risk,current.risk()) ? current.cardAsOf() : at;
-        long version = mapper.nextSnapshotVersion(current.symbol());
+        long[] version = {current.snapshotVersion()};
+        if (!persistCard(current.symbol(), () -> version[0] = mapper.nextSnapshotVersion(current.symbol()))) return;
         var next = new AssetCardSnapshot(current.symbol(),current.assetName(),current.spotPrice(),current.latestPriceAt(),signal,risk,
-                current.health(),clock,version,featureVersion,modelVersion,calibrationVersion,thresholdVersion,current.priceTradeId());
-        persist(next, current.snapshotVersion());
+                current.health(),clock,version[0],featureVersion,modelVersion,calibrationVersion,thresholdVersion,current.priceTradeId());
+        if (!persistCard(current.symbol(), () -> persist(next, current.snapshotVersion()))) return;
         if (signalChanged) publish(next,"ASSET_CARD_SIGNAL",payload("signal",signal,"risk",risk,"cardAsOf",clock,
                 "featureVersion",featureVersion,"modelVersion",modelVersion,"calibrationVersion",calibrationVersion),at);
         if (riskChanged) publish(next,"ASSET_CARD_RISK",payload("risk",risk,"cardAsOf",clock),at);
@@ -680,7 +723,7 @@ public class AssetCardService implements AutoCloseable {
     void flushPrices(Instant at) {
         if (!properties.isEnabled()) return;
         for (String symbol : market.subscribedSymbols()) {
-            try { refreshPrice(symbol, at); healthy(Field.PERSISTENCE, symbol); }
+            try { refreshPrice(symbol, at); }
             catch (RuntimeException failure) {
                 failed(Field.PERSISTENCE, symbol, "卡片快照存储暂时不可用");
                 log.warn("[asset-card] Snapshot publication failed ({})", failure.getClass().getSimpleName());
@@ -728,16 +771,24 @@ public class AssetCardService implements AutoCloseable {
         if (!priceChanged && !signalChanged && !riskChanged && !healthChanged) return;
         boolean durableChange = signalChanged || riskChanged || healthChanged;
         long version = current.snapshotVersion();
-        boolean canPersist = !started || writerReady;
+        boolean canPersist = (!started || writerReady) && persistenceAllowed();
         if (durableChange && canPersist) {
-            try { version = mapper.nextSnapshotVersion(symbol); }
+            try {
+                long[] reserved = {version};
+                canPersist = persistCard(symbol, () -> reserved[0] = mapper.nextSnapshotVersion(symbol));
+                version = reserved[0];
+            }
             catch (RuntimeException denied) { canPersist = false; failed(Field.PERSISTENCE, symbol, "卡片状态保存失败；价格独立更新"); }
         }
         var next = new AssetCardSnapshot(symbol, current.assetName(), price, priceAt, signal, risk, health,
                 sameEffectiveSignal(signal, current.signal()) && sameEffectiveRisk(risk, current.risk()) ? current.cardAsOf() : at, version,
                 current.featureVersion(), current.modelVersion(), current.calibrationVersion(),current.thresholdVersion(), quote == null ? null : quote.tradeId());
         if (durableChange && canPersist) {
-            try { persist(next, current.snapshotVersion()); }
+            try {
+                AssetCardSnapshot toStore = next;
+                long expectedVersion = current.snapshotVersion();
+                canPersist = persistCard(symbol, () -> persist(toStore, expectedVersion));
+            }
             catch (RuntimeException denied) {
                 failed(Field.PERSISTENCE, symbol, "卡片状态保存失败；价格独立更新");
                 // A failed CAS must not publish uncommitted signal/risk as a new durable version.
@@ -751,7 +802,7 @@ public class AssetCardService implements AutoCloseable {
         if (priceChanged && quote != null) publish(next, "ASSET_CARD_PRICE", payload("spotPrice", price, "latestPriceAt", priceAt,
                 "priceTradeId", quote.tradeId()), at);
         if (!canPersist) {
-            if (quote == null && usesCardSignalDisplay(symbol))
+            if (quote == null)
                 dispatch(next, "ASSET_CARD_HEALTH", payload("health", health, "signal", signal, "risk", risk), at);
             return;
         }
@@ -771,6 +822,23 @@ public class AssetCardService implements AutoCloseable {
         return new AssetCardSnapshot.Risk("HIGH", items, at,
                 signal.direction() == null ? AssetCardSnapshot.SignalSide.NON_DIRECTIONAL : signal.direction().signalSide(),
                 signal.direction(), signal.signalAsOf(), previous == null ? null : previous.riskMarketAsOf(), riskVersion(model));
+    }
+
+    /** A newer real trade disproves only the older missing-Spot claim, not other data or risk evidence. */
+    private static AssetCardSnapshot.Risk recoveredSpotRisk(AssetCardSnapshot.Risk risk, Instant observedAt) {
+        if (risk.items().stream().noneMatch(item -> obsoleteSpotFailure(item, observedAt))) return risk;
+        var items = risk.items().stream().map(item -> obsoleteSpotFailure(item, observedAt)
+                ? AssetCardSnapshot.RiskItem.unknown(AssetCardSnapshot.RiskType.DATA, "现货成交已恢复，其他数据证据待重新评估") : item).toList();
+        // Preserve the existing HIGH-before-MEDIUM aggregation; the withdrawn DATA item is UNKNOWN, never LOW.
+        String overall = items.stream().anyMatch(item -> "HIGH".equals(item.level())) ? "HIGH"
+                : items.stream().anyMatch(item -> "MEDIUM".equals(item.level())) ? "MEDIUM" : null;
+        return new AssetCardSnapshot.Risk(overall, items, risk.riskAsOf(), risk.riskBasisSide(), risk.riskBasisDirection(),
+                risk.riskBasisSignalAsOf(), risk.riskMarketAsOf(), risk.riskVersion());
+    }
+
+    private static boolean obsoleteSpotFailure(AssetCardSnapshot.RiskItem item, Instant observedAt) {
+        return "DATA".equals(item.type()) && "SPOT_SOURCE_UNAVAILABLE".equals(item.evidenceValue())
+                && "SOURCE_STATE".equals(item.unit()) && item.asOf() != null && item.asOf().isBefore(observedAt);
     }
 
     private void persist(AssetCardSnapshot snapshot, long expectedSnapshotVersion) {
@@ -932,6 +1000,7 @@ public class AssetCardService implements AutoCloseable {
                 && quote.observedAt().isAfter(health.asOf());
         boolean priceMissing = currentPrice == null || currentPriceAt == null || currentPriceAt.isAfter(now)
                 || !now.isBefore(priceValidUntil) || sourceWasLost && !recoveryTrade;
+        if (!priceMissing && quote != null) risk = recoveredSpotRisk(risk, quote.observedAt());
         if (priceMissing) {
             signal = signal.direction() != null ? signal.invalidated() : signal;
             risk = sourceLostRisk(signal, risk, now, model);
@@ -980,7 +1049,8 @@ public class AssetCardService implements AutoCloseable {
         }
         if (sourceLost) {
             signal = signal.direction() == null ? signal : signal.invalidated();
-            risk = sourceLostRisk(signal, risk, checkedAt, model);
+            // snapshot() verifies the actual current trade before projecting source-loss DATA risk.
+            // Re-stamping an old source failure here would contradict a newer valid recovery trade.
         }
         return new AssetCardSnapshot(snapshot.symbol(), snapshot.assetName(), snapshot.spotPrice(), snapshot.latestPriceAt(),
                 signal, risk, trusted || sourceLost ? snapshot.health() : new AssetCardSnapshot.Health("MODEL_UNAVAILABLE", "卡片模型、校准或阈值版本不可用", checkedAt),
@@ -1093,12 +1163,18 @@ public class AssetCardService implements AutoCloseable {
         private final ObjectMapper json;
         private final Path archiveRoot;
         private final long minimumFreeBytes;
+        private final java.util.function.BooleanSupplier persistenceAllowed;
         RetentionLifecycle(AssetCardMapper mapper,ObjectMapper json,Path archiveRoot,long minimumFreeBytes) {
+            this(mapper,json,archiveRoot,minimumFreeBytes,() -> true);
+        }
+        RetentionLifecycle(AssetCardMapper mapper,ObjectMapper json,Path archiveRoot,long minimumFreeBytes,
+                           java.util.function.BooleanSupplier persistenceAllowed) {
             this.mapper=Objects.requireNonNull(mapper);
             this.json=json.copy().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                     .enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
             this.archiveRoot=archiveRoot;
             this.minimumFreeBytes=minimumFreeBytes;
+            this.persistenceAllowed=Objects.requireNonNull(persistenceAllowed);
         }
         record Result(String status,int archived,int deleted,int protectedInferences) {}
         Result run(String symbol,Instant now,Duration bars,Duration features,Duration trades,Duration labels,int batchSize) {
@@ -1118,6 +1194,7 @@ public class AssetCardService implements AutoCloseable {
         }
         private Result retainLocked(String symbol,Instant now,Duration barRetention,Duration featureRetention,Duration tradeRetention,
                                     Duration labelRetention,int batchSize,Instant explicitlyProtectedFrom) {
+            requirePersistence();
             Path root=checkedRoot(archiveRoot);
             checkSpace(root,minimumFreeBytes,0);
             ArchiveCatalog catalog=ArchiveCatalog.load(root,symbol,json);
@@ -1125,10 +1202,12 @@ public class AssetCardService implements AutoCloseable {
             Instant protectedFrom=explicitlyProtectedFrom; int protectedCount=0, scanned=0;
             AssetCardMapper.TypedHistory cursor=null;
             while(true) {
+                requirePersistence();
                 var page=mapper.selectHistoryPage(symbol,AssetCardMapper.HistoryKind.INFERENCE,Instant.EPOCH,now.plusMillis(1),now,
                         cursor==null?null:cursor.signalAsOf(),cursor==null?null:cursor.recordKey(),500);
                 if(page.isEmpty()) break;
                 for(var row:page) {
+                    requirePersistence();
                     cursor=row;
                     if(++scanned>10000) throw new RetentionFailure("RETENTION_INFERENCE_SCAN_LIMIT_DATA_PRESERVED");
                     var item=pipeline.materialize(row,now);
@@ -1155,6 +1234,7 @@ public class AssetCardService implements AutoCloseable {
                     mapper.selectArchiveBars(symbol,barCutoff,now,batchSize-history.size());
             if(history.isEmpty() && barRows.isEmpty()) return new Result(protectedCount==0?"NOTHING_EXPIRED":"PENDING_LABEL_DEPENDENCIES_PRESERVED",0,0,protectedCount);
             var contents=new AssetCardMapper.VerifiedArchive(1,"ASSET_CARD_HISTORY_ARCHIVE_V1",symbol,history.size(),barRows.size(),history,barRows);
+            requirePersistence();
             ArchiveFile archive=publish(root,symbol,contents);
             // Re-open bytes from disk through exactly the verifier used immediately before every delete.
             var restored=AssetCardMapper.readVerifiedArchive(archive.path(),archive.sha256(),symbol);
@@ -1167,12 +1247,20 @@ public class AssetCardService implements AutoCloseable {
                 Duration duration=kind==AssetCardMapper.HistoryKind.TRADE?tradeRetention:kind==AssetCardMapper.HistoryKind.LABEL?labelRetention:featureRetention;
                 var confirmation=new AssetCardMapper.ArchiveConfirmation(symbol,kind,selected.stream().map(AssetCardMapper.TypedHistory::recordKey).toList(),
                         Instant.EPOCH,earlier(now.minus(duration),protectedFrom),now,archive.sha256(),now,archive.path());
+                requirePersistence();
                 deleted+=mapper.pruneArchivedHistory(confirmation,batchSize);
             }
-            if(!barRows.isEmpty()) deleted+=mapper.pruneArchivedBars(new AssetCardMapper.BarArchiveConfirmation(symbol,
-                    barRows.stream().map(b -> new AssetCardMapper.BarIdentity(b.interval(),b.openTime())).toList(),Instant.EPOCH,
-                    barCutoff,now,archive.sha256(),now,archive.path()),batchSize);
+            if(!barRows.isEmpty()) {
+                requirePersistence();
+                deleted+=mapper.pruneArchivedBars(new AssetCardMapper.BarArchiveConfirmation(symbol,
+                        barRows.stream().map(b -> new AssetCardMapper.BarIdentity(b.interval(),b.openTime())).toList(),Instant.EPOCH,
+                        barCutoff,now,archive.sha256(),now,archive.path()),batchSize);
+            }
+            requirePersistence(); // A stop during a delete rolls back this transaction; verified archive/evidence stay intact.
             return new Result("ARCHIVED_VERIFIED_AND_PRUNED",history.size()+barRows.size(),deleted,protectedCount);
+        }
+        private void requirePersistence() {
+            if (!persistenceAllowed.getAsBoolean()) throw new RetentionFailure("PENDING_COLLECTION_STOPPED");
         }
         private record ArchiveFile(Path path,String sha256) {}
         private ArchiveFile publish(Path root,String symbol,AssetCardMapper.VerifiedArchive contents) {
@@ -1418,18 +1506,22 @@ public class AssetCardService implements AutoCloseable {
                 result.put("sourceVersion",AssetCardFeatureService.SPOT_SOURCE_VERSION); return result;
             }).toList();
         }
-        @SuppressWarnings("unchecked")
         void save(AssetCardMapper.TypedHistory inference,Materialized item) {
+            save(inference, item, action -> { action.run(); return true; });
+        }
+        @SuppressWarnings("unchecked")
+        boolean save(AssetCardMapper.TypedHistory inference,Materialized item,java.util.function.Predicate<Runnable> persistence) {
             try {
-                if(persisted(inference,item,item.maturedAt())) return; // A verified archived pair is already durable; do not recreate pruned labels.
+                if(persisted(inference,item,item.maturedAt())) return true; // A verified archived pair is already durable; do not recreate pruned labels.
                 var labels=(Map<String,Map<String,Object>>)item.record().get("labelResults");
                 for (var label:labels.values()) {
                     String encoded=json.writeValueAsString(payload("label",label,"evidenceSha256",item.evidenceSha256(),
                             "inferenceKey",inference.recordKey(),"dataKind","LIVE_OBSERVED_MATURE_CARD_LABEL"));
-                    mapper.saveLabel(inference.symbol(),(Instant)label.get("signalAsOf"),(String)label.get("instrument"),
+                    if (!persistence.test(() -> mapper.saveLabel(inference.symbol(),(Instant)label.get("signalAsOf"),(String)label.get("instrument"),
                             (String)label.get("sourceVersion"),(Long)label.get("signalTradeId"),(String)label.get("featureVersion"),
-                            LABEL_DEFINITION,(String)label.get("side"),item.maturedAt(),encoded);
+                            LABEL_DEFINITION,(String)label.get("side"),item.maturedAt(),encoded))) return false;
                 }
+                return true;
             } catch (JsonProcessingException failure) { throw new IllegalStateException("CARD_LABEL_ENCODING_FAILED",failure); }
         }
         private boolean persisted(AssetCardMapper.TypedHistory inference,Materialized item,Instant cutoff) {

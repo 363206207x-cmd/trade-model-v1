@@ -137,6 +137,8 @@ class HomeUiReviewRuntimeContractTest {
                 const pinned = opportunityCard({...assets[1],homePinned:true,planMode:'BLOCKED'},'ETHUSDT');
                 assert.ok(pinned.includes('<div class="opportunity-facts"><div class="asset-card-risk-summary"'));
                 assert.ok(!pinned.includes('计划阻断'), 'pin/plan state must not supply card signal or risk');
+                assert.ok(!pinned.includes('pinned-observation-copy') && !pinned.includes('置顶观察'));
+                assert.ok(!pinned.includes('asset-price-caption') && !pinned.includes('最近闭线价') && !pinned.includes('实时价'));
                 const evidencedRisk = {riskType:'EVENT_RISK', evidenceStatus:'AVAILABLE', severity:'HIGH',
                   currentValue:'2', source:'fixture-event-source', observedAt:'2026-09-07T05:00:00Z',
                   primaryEvidence:'Test-only independently observed event count', evidenceId:'fixture-evidence-1'};
@@ -170,7 +172,8 @@ class HomeUiReviewRuntimeContractTest {
                   SHORT:'偏空',WEAK_SHORT:'弱偏空',RANGE:'震荡',WATCH:'观望'};
                 let cardVersion = 10;
                 for (const [direction, copy] of Object.entries(directions)) {
-                  const signal = {...assets[0].cardSignal.signal,direction};
+                  const signal = {...assets[0].cardSignal.signal,direction,pLong:.54,pShort:.54,
+                    calibratedConfidence:['RANGE','WATCH'].includes(direction)?null:54};
                   const directionHtml = opportunityCard({...assets[0],cardSignal:{...assets[0].cardSignal,
                     snapshotVersion:cardVersion++,signal}},'BTCUSDT');
                   assert.equal(directionHtml.includes('<b data-live-field="direction" class="asset-card-'
@@ -186,13 +189,25 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(oldHtml.includes('<b data-live-field="direction" class="asset-card-weak-short">弱偏空</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">54%%</strong>'), true);
                 const clock = freshHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1];
                 assert.match(clock, /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/);
-                assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:'Asia/Shanghai'})
                   .format(new Date(assets[0].cardSignal.signal.signalAsOf)));
-                assert.notEqual(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                assert.notEqual(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:'Asia/Shanghai'})
                   .format(new Date(assets[0].cardSignal.cardAsOf)), 'risk/connection update time is not the displayed analysis clock');
                 for (const field of ['featureVersion','modelVersion','calibrationVersion','thresholdVersion']) {
-                  assert.equal(assetCardConfidence({...assets[0].cardSignal,[field]:null}), '—', field);
-                  assert.equal(assetCardDirection({...assets[0].cardSignal,[field]:null}), '—', field);
+                  for (const invalid of [null,' ',17]) {
+                    assert.equal(assetCardConfidence({...assets[0].cardSignal,[field]:invalid}), '—', field);
+                    assert.equal(assetCardDirection({...assets[0].cardSignal,[field]:invalid}), '—', field);
+                  }
+                }
+                for (const invalid of [null,'not-a-time','2026-09-10T00:00:00','2026-09-10T00:01:00Z']) {
+                  const incomplete={...assets[0].cardSignal,signal:{...assets[0].cardSignal.signal,signalAsOf:invalid}};
+                  assert.equal(assetCardConfidence(incomplete),'—');assert.equal(assetCardDirection(incomplete),'—');
+                }
+                for (const [field,value] of [['calibratedConfidence',null],['calibratedConfidence',53],['calibratedConfidence',NaN],
+                    ['pLong',null],['pShort',null],['pLong',-1],['pShort',1.1]]) {
+                  const incomplete={...assets[0].cardSignal,signal:{...assets[0].cardSignal.signal,[field]:value}};
+                  assert.equal(assetCardConfidence(incomplete),'—');assert.equal(assetCardDirection(incomplete),'—');
+                  assert.equal(incomplete.signal.direction,'WEAK_SHORT','display rejection does not rewrite audit direction');
                 }
                 applyAssetCardEvent({eventType:'ASSET_CARD_PRICE',symbol:'BTCUSDT',snapshotVersion:41,
                   payload:{symbol:'BTCUSDT',snapshotVersion:41,spotPrice:321.5,latestPriceAt:'2026-09-10T00:00:05Z',cardAsOf:'2099-01-01T00:00:00Z'}});
@@ -203,6 +218,30 @@ class HomeUiReviewRuntimeContractTest {
                 const priceHtml = opportunityCard({...assets[0],cardSignal:null},'BTCUSDT');
                 assert.equal(priceHtml.includes('data-live-field="price">$321.5'), true);
                 assert.equal(priceHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1], clock);
+                assert.equal((priceHtml.match(/<time\\b/g)||[]).length,1);
+                const invalidated={...assets[1].cardSignal,snapshotVersion:99,
+                  signal:{...assets[1].cardSignal.signal,status:'INVALIDATED',calibratedConfidence:null}};
+                const invalidatedHtml=opportunityCard({...assets[1],cardSignal:invalidated},'ETHUSDT');
+                assert.match(invalidatedHtml,new RegExp('data-live-field="direction"[^>]*>—</b>'));
+                assert.ok(invalidatedHtml.includes('data-live-field="confidence">—</strong>'));
+                assert.equal(assetCardSnapshots.get('ETHUSDT').signal.direction,'WEAK_SHORT');
+                assert.equal(assetCardSnapshots.get('ETHUSDT').risk.riskBasisSide,'SHORT');
+                for (const basis of ['LIVE','CLOSED_5M','UNKNOWN']) {
+                  const legacy={...assets[2],cardSignalDisplayEnabled:false,homePinned:true,
+                    latestPrice:99999,latestPriceSource:'BINANCE_MARK_PRICE_WEBSOCKET',priceBasis:basis,
+                    latestPriceAt:'2026-09-10T00:00:05Z',directionCalculatedAt:'2026-09-10T00:00:00Z'};
+                  const legacyHtml=opportunityCard(legacy,'SOLUSDT');
+                  assert.ok(legacyHtml.includes('data-live-field="confidence">80%%'));
+                  assert.ok(legacyHtml.includes('data-live-field="price">—')&&!legacyHtml.includes('99,999'));
+                  assert.ok(!legacyHtml.includes('asset-price-caption')&&!legacyHtml.includes('pinned-observation-copy'));
+                  assert.ok(!legacyHtml.includes('最近闭线价')&&!legacyHtml.includes('实时价')&&!legacyHtml.includes('置顶观察'));
+                  assert.equal((legacyHtml.match(/<time\\b/g)||[]).length,1);
+                  assert.match(legacyHtml,new RegExp('class="opportunity-updated"[^>]*>08:00:00</time>'));
+                  assert.equal(assetCardSnapshots.get('SOLUSDT'),undefined,'legacy does not consume attached private cardSignal');
+                  const unavailable=opportunityCard({...legacy,marketBiasLabel:'暂不可判断',finalConfidence:60},'SOLUSDT');
+                  assert.match(unavailable,new RegExp('data-live-field="direction"[^>]*>—</b>'));
+                  assert.ok(unavailable.includes('data-live-field="confidence">—')&&!unavailable.includes('60%%'));
+                }
                 console.log('HOME_OPPORTUNITY_PRESSED_STATE=PASS');
                 """.formatted(semanticClass, stateBadge, opportunityCard);
 

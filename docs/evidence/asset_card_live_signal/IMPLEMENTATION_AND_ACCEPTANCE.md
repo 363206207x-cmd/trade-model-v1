@@ -1,5 +1,80 @@
 # Asset-card live signal implementation evidence
 
+## V42 PR #1302 final card-only continuation — 2026-09-12
+
+This section supersedes earlier *current status* statements only; historical
+implementation, runtime, budget and incident evidence below is retained.
+No deployment or visible-page acceptance is claimed by this source update.
+
+Gate PR #1303 Head `2024f1bc190bc88b55871f2e73047f82b34cf3a8` changed exactly
+the five Owner-authorized gate/source files. Its manual and Ready-triggered
+reviews completed without blocking findings, its exact-head quality checks
+passed and workflow-contract passed twice. Actual squash merge:
+`c21ecf1e273fa262584312ec7a1ace0d95889801`. The three matching assertions now
+use here-strings, retaining their predicates, failure reasons and bounded
+diagnostics. A 1 MiB early-match regression reproduces old `[141, 0]` pipeline
+statuses and validates the corrected input path; 101 public outer-gate cases
+retain the exact identities, 64 paths and historical-package rejection rules.
+This does not reconstruct the request missing from the original CI log.
+
+The existing business branch merged that main as
+`17a01a588033396e8db02737cae08d809d8d7209`. Audited business Head
+`ef8f0b098e56e15c2bc3c42db040c0360cfc9bed` remains an ancestor; all eleven
+business files were byte-identical immediately after synchronization. No
+force push, reset or replacement of prior implementation occurred.
+
+Initial live-gate queries failed closed because GitHub evidence could not be
+read: the captured exact source-PR request returned EOF. No permission logic,
+authentication setting or query result was changed to recover admission.
+After the real request succeeded, the unchanged business-worktree outer gate
+reported `REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`,
+`IMPLEMENTATION_ALLOWED=true`, `RESOLUTION_BLOCK_REASON=NONE`, count 64.
+Product Source, task validation and complete workflow-contract then passed.
+
+Current work is limited to card display correctness and the existing runtime
+recovery/stop boundary. Final business test counts, candidate identity, remote
+CI/review and deployment observations must be recorded after actual execution;
+the historical results below are not substitute evidence for the new Head.
+The initial trigger of the old 41-minute market stall remains UNKNOWN.
+The old window and original budget ledger must not be reset or resumed.
+SHADOW remains the model mode; production training/calibration samples,
+production metrics and model readiness are not established by test fixtures.
+
+### Preserved-worktree validation and non-destructive candidate build
+
+The nine preserved WIP files remain within the same eleven-file PR scope and
+unchanged 64-path allowlist. Card-only regressions cover both reachable renderers:
+no price-source/time row or pinned-observation copy; no invalid ninth direction
+with a percentage; independent signed risks, partial UNKNOWN and aggregate-only
+rejection; one Beijing analysis clock unaffected by price updates. The Owner
+preview never borrows canonical direction, confidence or risk. Legacy Mark/closed
+bar values lack Spot trade/expiry proof and therefore cannot fill the main price.
+
+Controlled-window persistence now shares bounded admission with the original
+terminal lease. A stopped/expired window admits no new bar, trade, inference,
+label, snapshot or retention write. Pending labels/cursors and original evidence
+remain intact; only already-admitted finite IO may drain. This supersedes older
+release text allowing unrestricted offline maturity after STOP. The real
+single-connection PostgreSQL regression proves that a writer transaction does
+not wait for the lease monitor while its storage check needs that connection.
+Recovered Spot prices withdraw only the older disproved Spot-source DATA fault,
+not other independent risks, prediction invalidation or the analysis clock.
+
+No `clean`, target deletion or history rewrite was used. An initial native-profile
+test run produced the common-checkout identity and correctly failed the provenance
+guard (489 tests, one failure, one local ACL skip). The retained wrong metadata and
+reports were preserved outside Git. The existing plugin was then run only in
+`initialize`, with this worktree's real Git location; default `test` ran without
+Git-location overrides or the identity profile. Generated identity was the actual
+`17a01a588033396e8db02737cae08d809d8d7209`, `git.dirty=true`, not a release artifact.
+The repeated focused run passed: 489 tests, zero failures/errors, one local
+LinuxKit tmpfs POSIX-ACL skip requiring actual final-head Linux CI execution.
+Python numerical tests: 49 passed. Frontend event/expiry/visibility/three-timezone
+matrix, JS syntax and diff checks passed. Assertions were not weakened to hide
+the identity failure. Candidate and merged-main builds must each use a new clean
+isolated checkout and their own generated identity and SHA-256; full Maven,
+packaged-JAR/CI/review and actual Staging evidence remain separate requirements.
+
 ## V42 stream recovery and stale-price correction — 2026-09-12
 
 This is the same V42 card-only task, not a new model or algorithm. The business

@@ -118,9 +118,18 @@ public class AssetCardMarketDataService implements AutoCloseable {
     private volatile Instant connectedAt;
     private volatile Instant lastFrameAt;
     private volatile Instant lastMarketFrameAt;
+    private volatile Instant lastReceivedFrameAt;
+    private volatile Instant lastReceivedMarketAt;
+    private Instant lastRuntimeLogAt;
+    private long lastRuntimeEpoch = -1;
+    private String lastRuntimeLease;
+    private boolean lastRuntimeHadSocket;
     private volatile boolean stopped;
     private volatile BooleanSupplier writerReadiness = () -> false;
     private final CollectionLease collectionLease;
+    // Admission shares the terminal-state monitor; database IO never holds it or the transport monitor.
+    private int persistenceInFlight, persistenceWaiting;
+    private long persistenceCompleted, persistenceRejected;
     private final Set<CompletableFuture<?>> depthRequests = ConcurrentHashMap.newKeySet();
 
     public AssetCardMarketDataService(AssetCardProperties properties, ObjectMapper json, AssetCardMapper mapper) {
@@ -200,8 +209,63 @@ public class AssetCardMarketDataService implements AutoCloseable {
     public boolean collectionAccepting(Instant now) {
         return !stopped && properties.getModelMode() == AssetCardProperties.ModelMode.SHADOW && collectionLease.accepting(now);
     }
+
+    /** Read-only admission: never refreshes a lease, allowance or persisted stop state. */
+    boolean persistenceAllowed(Instant at) {
+        // May be called inside a writer transaction. Never wait for the lease monitor,
+        // whose storage check can itself need that connection; accepting() reads volatile state.
+        if (stopped || at == null || !properties.isWriterEnabled() || !writerReadiness.getAsBoolean()) return false;
+        boolean localOnly = !properties.isExternalCallsEnabled() && properties.getCollectionWindow().getId() == null
+                && "NOT_STARTED".equals(collectionLease.status());
+        return localOnly || properties.getModelMode() == AssetCardProperties.ModelMode.SHADOW && collectionLease.accepting(at);
+    }
+
+    /** Bounded admission shared by every card write; an admitted operation may finish after a stop. */
+    boolean persistCard(Instant at, Runnable action) {
+        return persistCard(at, () -> true, action);
+    }
+
+    private boolean persistCard(Instant at, BooleanSupplier current, Runnable action) {
+        java.util.Objects.requireNonNull(action);
+        long started = System.nanoTime();
+        long timeout = properties.getWriter().getConnectionTimeout().toNanos();
+        synchronized (collectionLease) {
+            persistenceWaiting++;
+            try {
+                while (true) {
+                    long elapsed = Math.max(0, System.nanoTime() - started);
+                    // A queued operation must not carry its pre-wait instant past an absolute deadline.
+                    Instant admissionAt = at == null ? null : at.plusNanos(elapsed);
+                    if (!persistenceAllowed(admissionAt) || !current.getAsBoolean() || elapsed >= timeout) {
+                        persistenceRejected++; return false;
+                    }
+                    if (persistenceInFlight < properties.getWriter().getMaximumPoolSize()) {
+                        persistenceInFlight++; break;
+                    }
+                    try { TimeUnit.NANOSECONDS.timedWait(collectionLease, Math.min(timeout - elapsed, TimeUnit.MILLISECONDS.toNanos(50))); }
+                    catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt(); persistenceRejected++; return false;
+                    }
+                }
+            } finally { persistenceWaiting--; }
+        }
+        try { action.run(); return true; }
+        finally {
+            synchronized (collectionLease) {
+                persistenceInFlight--; persistenceCompleted++;
+                collectionLease.notifyAll();
+            }
+        }
+    }
+
+    int persistenceInFlight() { synchronized (collectionLease) { return persistenceInFlight; } }
+    int persistenceWaiting() { synchronized (collectionLease) { return persistenceWaiting; } }
+    long persistenceCompleted() { synchronized (collectionLease) { return persistenceCompleted; } }
+    long persistenceRejected() { synchronized (collectionLease) { return persistenceRejected; } }
+
     void stopCollection(String reason, Instant now) {
         collectionLease.stop(reason, now);
+        synchronized (collectionLease) { collectionLease.notifyAll(); }
         stopCardTransport();
     }
     private void stopCardTransport() {
@@ -258,12 +322,17 @@ public class AssetCardMarketDataService implements AutoCloseable {
 
     @Scheduled(fixedDelayString = "${trade-model.asset-card.connection-check-ms:5000}", initialDelay = 1000L)
     public synchronized void ensureConnected() {
+        Instant now = Instant.now();
+        try { ensureConnectedAt(now); }
+        finally { logRuntimeIfDue(now); }
+    }
+
+    private void ensureConnectedAt(Instant now) {
         if (stopped) return;
         if (!networkAllowed() || desiredSymbols.isEmpty()) {
             disconnect();
             return;
         }
-        Instant now = Instant.now();
         if (!writerReadiness.getAsBoolean() || properties.getModelMode() != AssetCardProperties.ModelMode.SHADOW
                 || !collectionLease.check(now)) { disconnect(); return; }
         if (socket != null) {
@@ -310,6 +379,22 @@ public class AssetCardMarketDataService implements AutoCloseable {
             connecting.set(false); connectionAttempt = null; connectionFailed(now);
             log.warn("[asset-card] Spot handshake rejected attempt={} kind={}", attempt, rejected.getClass().getSimpleName());
         }
+    }
+
+    /** Existing lifecycle cadence only; no per-frame logging, endpoint, credentials or raw data. */
+    private void logRuntimeIfDue(Instant now) {
+        if (!properties.isEnabled() || !properties.isExternalCallsEnabled()) return;
+        String lease = collectionLease.status();
+        String terminal = Set.of("NOT_STARTED", "WAITING_FIXED_START", "RUNNING", "REST_MINUTE_BUDGET_WAIT").contains(lease) ? null : lease;
+        boolean changed = !java.util.Objects.equals(lastRuntimeLease, terminal)
+                || connectionEpoch != lastRuntimeEpoch && (socket != null || lastRuntimeHadSocket);
+        if (!changed && lastRuntimeLogAt != null && now.isBefore(lastRuntimeLogAt.plusSeconds(60))) return;
+        lastRuntimeLogAt = now; lastRuntimeEpoch = connectionEpoch;
+        lastRuntimeLease = terminal; lastRuntimeHadSocket = socket != null;
+        log.info("[asset-card] Spot runtime utc={} epoch={} attempt={} connected={} connecting={} lastReceivedFrameAt={} lastReceivedMarketAt={} queues={}/{}/{} drops={}/{}/{} reconnects={} lease={} persistenceInFlight={} persistenceCompleted={} persistenceRejected={}",
+                now, connectionEpoch, attemptEpoch, socket != null, connecting.get(), lastReceivedFrameAt, lastReceivedMarketAt,
+                queueDepth(tradeFrames), queueDepth(depthFrames), queueDepth(barFrames), tradeDrops.get(), depthDrops.get(), barDrops.get(),
+                reconnects.get(), lease, persistenceInFlight(), persistenceCompleted(), persistenceRejected());
     }
 
     URI streamUri(Set<String> symbols) {
@@ -452,7 +537,8 @@ public class AssetCardMarketDataService implements AutoCloseable {
     private synchronized boolean recordFrame(WebSocket expected, Instant at, boolean market) {
         if (socket != expected) return false;
         lastFrameAt = at;
-        if (market) lastMarketFrameAt = at;
+        lastReceivedFrameAt = at;
+        if (market) { lastMarketFrameAt = at; lastReceivedMarketAt = at; }
         return true;
     }
 
@@ -465,6 +551,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
         depthStates.values().forEach(state -> state.bootstrapInFlight = false);
         connectionSymbols = symbols; connectedAt = at;
         lastFrameAt = at; lastMarketFrameAt = at;
+        lastReceivedFrameAt = null; lastReceivedMarketAt = null;
         connectionFailures = 0; reconnectAfter = Instant.MIN; rolloverRequested = false; controlInFlight = false;
         if (previous != null && previous != opened) previous.abort();
         return true;
@@ -483,8 +570,8 @@ public class AssetCardMarketDataService implements AutoCloseable {
             connectionSymbols = Set.of();
             controlInFlight = false;
             connectionFailed(at);
-            log.warn("[asset-card] Spot connection retired reason={} epoch={} lastFrameAt={} lastMarketFrameAt={} lease={} queues={}/{}/{} reconnects={}",
-                    reason, connectionEpoch, lastFrameAt, lastMarketFrameAt, collectionStatus(),
+            log.warn("[asset-card] Spot connection retired reason={} epoch={} lastReceivedFrameAt={} lastReceivedMarketAt={} lease={} queues={}/{}/{} reconnects={}",
+                    reason, connectionEpoch, lastReceivedFrameAt, lastReceivedMarketAt, collectionStatus(),
                     queueDepth(tradeFrames), queueDepth(depthFrames), queueDepth(barFrames), reconnects.get());
             previous.abort();
             clearLiveData(lostSymbols);
@@ -1183,9 +1270,16 @@ public class AssetCardMarketDataService implements AutoCloseable {
                 volume, takerVolume, tradeCount, receivedAt);
         synchronized (cache) {
             if (cache.containsKey(openTime) || !currentEpoch(epoch)) return;
+            // Stop/expiry is not an IO failure and must not create another inference event.
+            if (!persistenceAllowed(Instant.now()) && (properties.isExternalCallsEnabled() || properties.getCollectionWindow().valid())) return;
             boolean persistenceFailed = false;
             try {
-                if (properties.isWriterEnabled() && writerReadiness.getAsBoolean()) mapper.upsertClosedBar(value);
+                if (properties.isWriterEnabled() && writerReadiness.getAsBoolean()) {
+                    if (!persistCard(Instant.now(), () -> currentEpoch(epoch), () -> mapper.upsertClosedBar(value))) {
+                        if (!persistenceAllowed(Instant.now()) || !currentEpoch(epoch)) return;
+                        persistenceFailed = true;
+                    }
+                }
                 else persistenceFailed = true;
             }
             catch (RuntimeException failure) {
@@ -1195,6 +1289,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
             // Only this short cache/event commit owns the lifecycle lock; database IO and inference do not.
             synchronized (this) {
                 if (!desiredSymbols.contains(symbol) || !currentEpoch(epoch)) return;
+                if (!persistenceAllowed(Instant.now()) && (properties.isExternalCallsEnabled() || properties.getCollectionWindow().valid())) return;
                 if (persistenceFailed) notifyListeners(new MarketUpdate(symbol, "PERSISTENCE_FAILURE", value.closeTime(), interval));
                 cache.put(openTime, value);
                 while (cache.size() > properties.getRetainedBarsPerInterval()) cache.pollFirstEntry();
@@ -1246,7 +1341,22 @@ public class AssetCardMarketDataService implements AutoCloseable {
     }
     @PreDestroy public void close() {
         stopped = true; disconnect();
-        collectionLease.release(Instant.now());
+        long deadline = System.nanoTime() + properties.getWriter().getConnectionTimeout().toNanos();
+        synchronized (collectionLease) {
+            collectionLease.notifyAll();
+            String drainFailure = null;
+            while (persistenceInFlight > 0) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) { drainFailure = "PERSISTENCE_DRAIN_TIMEOUT"; break; }
+                try { TimeUnit.NANOSECONDS.timedWait(collectionLease, remaining); }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt(); drainFailure = "PERSISTENCE_DRAIN_INTERRUPTED"; break;
+                }
+            }
+            // Clean restart ownership is released only after all admitted IO has converged.
+            if (drainFailure == null) collectionLease.release(Instant.now());
+            else collectionLease.stop(drainFailure, Instant.now());
+        }
         for (ThreadPoolExecutor[] group : List.of(tradeFrames, depthFrames, barFrames))
             for (ThreadPoolExecutor executor : group) executor.shutdownNow();
     }

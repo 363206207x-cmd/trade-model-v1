@@ -64,7 +64,7 @@ function fixture(initialNow = null) {
   vm.runInContext(source.replace(bootstrap, exported + bootstrap), context);
   const home = { assets: ["BTCUSDT", "ETHUSDT"].map((symbol, index) => ({ assetId: index + 1, rawSymbol: symbol,
     name: symbol, slot: index + 1, homePinned: true, finalConfidence: 99, latestPrice: 99999,
-    cardSignalDisplayEnabled: true, hasFinal: true, marketBiasLabel: "偏空",
+    cardSignalDisplayEnabled: true, hasFinal: true, marketBiasLabel: "强偏空",
     finalMarketBias: "STRONG_BEARISH", riskLevel: "LOW" })), selectedSymbol: "BTCUSDT",
     positions: [{ positionId: "123", markPrice: 101 }], executionSuggestion: { status: "BLOCKED" },
     aiDecision: { tabs: [{ role: "GPT_FINAL" }] } };
@@ -106,6 +106,7 @@ function boundSnapshot(direction = "LONG", version = 1) {
   const value = snapshot("BTCUSDT", version);
   value.thresholdVersion = "test-only-threshold";
   value.signal.direction = direction;
+  value.signal.calibratedConfidence = /SHORT$/.test(direction) ? 20 : /LONG$/.test(direction) ? 72 : null;
   value.risk = { ...value.risk, riskBasisSide: /SHORT$/.test(direction) ? "SHORT" : /LONG$/.test(direction) ? "LONG" : "NON_DIRECTIONAL",
     riskBasisDirection: direction, riskBasisSignalAsOf: value.signal.signalAsOf,
     riskMarketAsOf: value.latestPriceAt, riskVersion: "test-only-risk" };
@@ -437,7 +438,9 @@ for (const flag of [false, undefined, "true"]) {
   for (const asset of assets) {
     const html = legacy.opportunityCard(asset, "BTCUSDT");
     assert.ok(html.includes('data-live-field="confidence">99%'), "disabled/SHADOW/outside-CANARY preserves the existing visible confidence");
-    assert.ok(html.includes('data-live-field="price">$99,999'), "the non-cohort keeps its pre-switch price renderer");
+    assert.ok(html.includes('data-live-field="price">—'), "a legacy Mark/closed-bar value without Spot trade identity cannot become the main price after source-caption removal");
+    assert.ok(!html.includes("asset-price-caption") && !html.includes("pinned-observation-copy"));
+    assert.ok(!html.includes("最近闭线价") && !html.includes("实时价") && !html.includes("价格来源待确认") && !html.includes("置顶观察"));
     assert.equal((html.match(/data-live-field="confidence"/g) || []).length, 1);
     assert.ok(html.includes('data-desktop-hover="risk"'), "outside-cohort keeps its actual evidence risk interaction");
     assert.ok(legacy.riskDrawerForTrigger({ dataset: { desktopHover: "risk", riskSymbol: asset.rawSymbol } }).includes("fixture-legacy-event"));
@@ -455,6 +458,39 @@ for (const flag of [false, undefined, "true"]) {
   legacy.setConnected(false); legacy.scheduleHomeFallbackPoll();
   assert.equal(legacy.intervals.size, 1);
   assert.equal([...legacy.intervals.values()][0].delay, 15000);
+}
+// Cosmetic legacy cleanup never enables the private renderer or borrows its probabilities.
+for (const caption of ["暂不可判断", "待重新分析", "周期冲突", "UNKNOWN", "", null]) {
+  const legacy = fixture();
+  const asset = { ...legacy.home.assets[0], cardSignalDisplayEnabled: false, marketBiasLabel: caption,
+    finalMarketBias: "UNDETERMINED", finalConfidence: 60, latestPriceSource: "BINANCE_MARK_PRICE_WEBSOCKET",
+    priceBasis: "LIVE", latestPriceAt: priceInstant(1), cardSignal: boundSnapshot("LONG", 10) };
+  const html = legacy.opportunityCard(asset, "BTCUSDT");
+  assert.match(html, /data-live-field="direction"[^>]*>—<\/b>/);
+  assert.ok(html.includes('data-live-field="confidence">—</strong>') && !html.includes("60%") && !html.includes("72%"));
+  assert.ok(html.includes('data-live-field="price">—</strong>') && !html.includes("99,999"));
+  assert.equal(legacy.snapshot("BTCUSDT"), undefined);
+}
+for (const basis of ["CLOSED_5M", "LIVE", "UNKNOWN"]) {
+  const legacy = fixture(), asset = { ...legacy.home.assets[0], cardSignalDisplayEnabled: false,
+    priceBasis: basis, latestPriceAt: priceInstant(1), directionCalculatedAt: "2026-09-10T00:00:00Z" };
+  const html = legacy.opportunityCard(asset, "BTCUSDT");
+  assert.ok(html.includes('data-live-field="confidence">99%'), "valid legacy direction/confidence stays outside the new cohort");
+  assert.equal((html.match(/<time\b/g) || []).length, 1, "legacy cards have only the analysis clock, never a price-caption clock");
+  assert.match(html, /class="opportunity-updated"[^>]*>08:00:00<\/time>/);
+  const field = legacy.nodes.get("BTCUSDT").fields.get("price"); field.textContent = "—";
+  legacy.applyHomeLiveEvent({ eventType: "ASSET_PRICE_UPDATED", symbol: "BTCUSDT", snapshotVersion: 20,
+    payload: { price: 88888, latestPrice: 88888, source: "BINANCE_MARK_PRICE_WEBSOCKET", latestPriceAt: priceInstant(20) } });
+  assert.equal(field.textContent, "—", "shared Mark SSE cannot reintroduce a revoked legacy main price");
+  assert.equal(legacy.timeouts.size, 0); assert.equal(legacy.requests.length, 0);
+  assert.ok(legacy.opportunityCard({ ...asset, latestPrice: 88888 }, "BTCUSDT").includes('data-live-field="price">—'));
+}
+for (const raw of ["UNDETERMINED", null, "BEARISH"]) {
+  const legacy = fixture(), asset = { ...legacy.home.assets[0], cardSignalDisplayEnabled: false,
+    marketBiasLabel: "偏多", finalMarketBias: raw, finalConfidence: 60 };
+  const html = legacy.opportunityCard(asset, "BTCUSDT");
+  assert.match(html, /data-live-field="direction"[^>]*>—<\/b>/);
+  assert.ok(html.includes('data-live-field="confidence">—') && !html.includes("60%"), "a translated label cannot override an absent or different legacy machine direction");
 }
 // A server-authorized SHADOW Owner sees actual independent fields, never private model probabilities.
 const ownerPreview = fixture();
@@ -532,6 +568,7 @@ const directions = { STRONG_LONG: "强偏多", LONG: "偏多", WEAK_LONG: "弱�
 let version = 1;
 for (const [direction, label] of Object.entries(directions)) {
   const card = snapshot("BTCUSDT", version++); card.signal.direction = direction;
+  card.signal.calibratedConfidence = /SHORT$/.test(direction) ? 20 : /LONG$/.test(direction) ? 72 : null;
   f.mergeAssetCardSnapshot(card, false);
   const html = f.opportunityCard(f.home.assets[0], "BTCUSDT");
   assert.ok(html.includes(label), direction);
@@ -546,7 +583,10 @@ assert.ok(html.includes("数据不足") && !html.includes("观望") && !html.inc
 const invalid = snapshot("BTCUSDT", version++); invalid.signal.status = "INVALIDATED";
 f.mergeAssetCardSnapshot(invalid, false);
 html = f.opportunityCard(f.home.assets[0], "BTCUSDT");
-assert.ok(html.includes("偏多") && html.includes("已失效") && !html.includes("72%"));
+assert.match(html, /data-live-field="direction"[^>]*>—<\/b>/);
+assert.ok(html.includes('data-live-field="confidence">—</strong>') && html.includes("已失效") && !html.includes("72%"));
+assert.equal(f.snapshot("BTCUSDT").signal.direction, "LONG", "invalidated direction remains an internal audit/risk basis, not a visible current prediction");
+assert.equal(f.snapshot("BTCUSDT").risk.riskBasisSide, "LONG");
 const unvalidated = snapshot("BTCUSDT", version++); unvalidated.modelVersion = null;
 f.mergeAssetCardSnapshot(unvalidated, false);
 assert.ok(!f.opportunityCard(f.home.assets[0], "BTCUSDT").includes("72%"));
@@ -555,13 +595,47 @@ for (const status of ["SHADOW", "UNVALIDATED", "UNKNOWN"]) {
   f.mergeAssetCardSnapshot(shadow, false);
   const hiddenModel = f.opportunityCard(f.home.assets[0], "BTCUSDT");
   assert.ok(!hiddenModel.includes("72%") && hiddenModel.includes("数据不足"), status);
+  assert.match(hiddenModel, /data-live-field="direction"[^>]*>—<\/b>/);
+}
+for (const mutation of [
+  value => { value.signal.signalAsOf = null; },
+  value => { value.signal.signalAsOf = "not-a-time"; },
+  value => { value.signal.signalAsOf = "2026-09-10T00:00:00"; },
+  value => { value.signal.signalAsOf = "2099-01-01T00:00:00Z"; },
+  value => { value.signal.direction = "CONFLICT"; },
+  ...[null, NaN, -1, 101, 72.5, 71].map(value => card => { card.signal.calibratedConfidence = value; }),
+  ...["pLong", "pShort"].flatMap(key => [null, NaN, -0.1, 1.1, ".72"].map(value => card => { card.signal[key] = value; })),
+  ...["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].map(key => value => { value[key] = " "; })
+]) {
+  const runtime = fixture(), value = boundSnapshot("LONG", 10); mutation(value);
+  const rendered = runtime.opportunityCard({ ...runtime.home.assets[0], cardSignal: value }, "BTCUSDT");
+  assert.match(rendered, /data-live-field="direction"[^>]*>—<\/b>/);
+  assert.ok(rendered.includes('data-live-field="confidence">—</strong>') && !rendered.includes("72%") && !rendered.includes("99%"),
+    "a current model prediction requires its own complete, time-valid identity on both initial render and patch");
+}
+for (const [direction, expected] of [["LONG", "追高风险"], ["SHORT", "追空风险"], ["RANGE", "位置风险"]]) {
+  const runtime = fixture(), value = boundSnapshot(direction, 10);
+  value.risk.items = [{ ...value.risk.items[0], level: "HIGH" }, ...["SHOCK", "REVERSAL", "CROWDING", "LIQUIDATION", "LIQUIDITY", "EVENT", "DATA"]
+    .map(type => ({ type, assessmentStatus: "UNKNOWN", level: null, reason: "TEST_NO_INDEPENDENT_EVIDENCE" }))];
+  const rendered = runtime.opportunityCard({ ...runtime.home.assets[0], riskLevel: "LOW", cardSignal: value }, "BTCUSDT");
+  assert.ok(rendered.includes(expected + "·高") && !rendered.includes('asset-card-risk-low">低'));
+  assert.equal((runtime.assetCardRiskDrawer(runtime.snapshot("BTCUSDT")).match(/risk-evidence-item/g) || []).length, 1);
+  assert.equal(runtime.snapshot("BTCUSDT").risk.items.length, 8, "partial unknowns cannot discard another independently known high risk");
+}
+for (const overallLevel of ["HIGH", "MEDIUM"]) {
+  const runtime = fixture(), value = boundSnapshot("LONG", 10);
+  value.risk = { ...value.risk, overallLevel, items: ["CHASE", "SHOCK", "REVERSAL", "CROWDING", "LIQUIDATION", "LIQUIDITY", "EVENT", "DATA"]
+    .map(type => ({ type, assessmentStatus: "UNKNOWN", level: null, reason: "TEST_NO_INDEPENDENT_EVIDENCE" })) };
+  const rendered = runtime.opportunityCard({ ...runtime.home.assets[0], riskLevel: "HIGH", cardSignal: value }, "BTCUSDT");
+  assert.match(rendered, /data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
+  assert.ok(!runtime.assetCardRiskDrawer(runtime.snapshot("BTCUSDT")).includes("risk-evidence-item"), "aggregate-only or canonical HIGH cannot substitute for independent card risk evidence");
 }
 const metadata = fixture();
 metadata.mergeAssetCardSnapshot(snapshot("BTCUSDT", 1), true);
-metadata.applyAssetCardEvent(event("SIGNAL", 2, { signal: { ...snapshot().signal, direction: "SHORT", calibratedConfidence: 68 },
+metadata.applyAssetCardEvent(event("SIGNAL", 2, { signal: { ...snapshot().signal, direction: "SHORT", calibratedConfidence: 68, pShort: .68 },
   featureVersion: null, modelVersion: null, calibrationVersion: null, thresholdVersion: null }));
 assert.equal(metadata.nodes.get("BTCUSDT").fields.get("confidence").textContent, "—", "a new SIGNAL without its own bundle metadata cannot borrow an old validated version");
-metadata.applyAssetCardEvent(event("SIGNAL", 3, { signal: { ...snapshot().signal, direction: "SHORT", calibratedConfidence: 68 },
+metadata.applyAssetCardEvent(event("SIGNAL", 3, { signal: { ...snapshot().signal, direction: "SHORT", calibratedConfidence: 68, pShort: .68 },
   featureVersion: "test-only-features-v2", modelVersion: "test-only-model-v2", calibrationVersion: "test-only-calibration-v2" }));
 assert.equal(metadata.nodes.get("BTCUSDT").fields.get("confidence").textContent, "68%");
 assert.equal(metadata.snapshot("BTCUSDT").modelVersion, "test-only-model-v2");
@@ -598,7 +672,7 @@ f.applyAssetCardEvent(event("PRICE", 105, { spotPrice: 105, latestPriceAt: price
 assert.equal(f.timeouts.size, 1, "one throttled price render per symbol");
 assert.ok([...f.timeouts.values()].every(timer => timer.delay > 0 && timer.delay <= 250));
 assert.equal(f.nodes.get("BTCUSDT").fields.get("price").textContent, "");
-f.applyAssetCardEvent(event("SIGNAL", 102, { signal: { ...base.signal, direction: "SHORT", calibratedConfidence: 68 }, cardAsOf: "2026-09-10T00:00:02Z", spotPrice: 1 }));
+f.applyAssetCardEvent(event("SIGNAL", 102, { signal: { ...base.signal, direction: "SHORT", calibratedConfidence: 68, pShort: .68 }, cardAsOf: "2026-09-10T00:00:02Z", spotPrice: 1 }));
 assert.equal(f.snapshot("BTCUSDT").signal.direction, "SHORT", "price version must not suppress newer signal group");
 assert.equal(f.snapshot("BTCUSDT").spotPrice, 105);
 assert.equal(f.nodes.get("BTCUSDT").fields.get("direction").textContent, "偏空");
@@ -852,7 +926,7 @@ if (!process.env.ASSET_CARD_CLOCK_CHILD) {
     assert.equal(child.status, 0, child.stderr);
   }
 } else {
-  const expected = { UTC: "00:00:00", "Asia/Shanghai": "08:00:00", "America/New_York": "20:00:00" }[process.env.TZ];
+  const expected = "08:00:00";
   assert.equal(f.assetCardClock("2026-09-10T00:00:00Z"), expected);
   assert.equal(f.assetCardClock(null), "—");
 }

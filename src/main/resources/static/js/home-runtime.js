@@ -778,19 +778,35 @@
     function assetCardClock(value) {
         var date = assetCardDate(value);
         return date ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit",
-            hourCycle: "h23" }).format(date) : "—";
+            hourCycle: "h23", timeZone: "Asia/Shanghai" }).format(date) : "—";
+    }
+    function assetCardHasVisibleSignal(snapshot) {
+        var signal = snapshot && snapshot.signal;
+        var at = signal && assetCardDate(signal.signalAsOf);
+        var completeIdentity = !!(snapshot && typeof snapshot.symbol === "string" && snapshot.symbol.trim()
+            && Number.isSafeInteger(snapshot.snapshotVersion) && snapshot.snapshotVersion > 0
+            && signal && signal.status === "VALID" && Object.prototype.hasOwnProperty.call(assetCardDirections, signal.direction)
+            && typeof signal.signalAsOf === "string" && /(Z|[+-]\d{2}:?\d{2})$/i.test(signal.signalAsOf)
+            && at && at <= new Date()
+            && ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].every(function (key) {
+                return typeof snapshot[key] === "string" && snapshot[key].trim();
+            }));
+        if (!completeIdentity) return false;
+        if (!/^(STRONG_|WEAK_)?(LONG|SHORT)$/.test(signal.direction)) return true;
+        // Check the existing server result as one unit; never calculate a substitute confidence.
+        var probability = /LONG$/.test(signal.direction) ? signal.pLong : signal.pShort;
+        return [signal.pLong, signal.pShort].every(function (value) { return Number.isFinite(value) && value >= 0 && value <= 1; })
+            && Number.isInteger(signal.calibratedConfidence)
+            && signal.calibratedConfidence === Math.round(probability * 100);
     }
     function assetCardDirection(snapshot) {
-        var signal = snapshot && snapshot.signal || {};
-        if (["VALID", "INVALIDATED"].indexOf(signal.status) < 0) return "—";
-        if (!snapshot.featureVersion || !snapshot.modelVersion || !snapshot.calibrationVersion || !snapshot.thresholdVersion) return "—";
-        return Object.prototype.hasOwnProperty.call(assetCardDirections, signal.direction) ? assetCardDirections[signal.direction] : "—";
+        // An invalidated direction remains an internal audit/risk basis, never a current visible prediction.
+        return assetCardHasVisibleSignal(snapshot) ? assetCardDirections[snapshot.signal.direction] : "—";
     }
     function assetCardConfidence(snapshot) {
         var signal = snapshot && snapshot.signal || {};
         var value = signal.calibratedConfidence;
-        return signal.status === "VALID" && /^(STRONG_|WEAK_)?(LONG|SHORT)$/.test(signal.direction || "")
-            && snapshot.modelVersion && snapshot.calibrationVersion && snapshot.featureVersion && snapshot.thresholdVersion
+        return assetCardHasVisibleSignal(snapshot) && /^(STRONG_|WEAK_)?(LONG|SHORT)$/.test(signal.direction || "")
             && Number.isInteger(value) && value >= 0 && value <= 100 ? value + "%" : "—";
     }
     function assetCardDirectionClass(snapshot) {
@@ -877,8 +893,8 @@
             riskBasisSignalAsOf: signal.signalAsOf || null, riskVersion: snapshot.riskVersion || null, reason: reason };
     }
     function assetCardRiskName(snapshot, type) {
-        return type === "CHASE" ? (snapshot.risk.riskBasisSide === "SHORT" ? "追空"
-            : snapshot.risk.riskBasisSide === "LONG" ? "追高" : "位置") : assetCardRiskNames[type];
+        return type === "CHASE" ? (snapshot.risk.riskBasisSide === "SHORT" ? "追空风险"
+            : snapshot.risk.riskBasisSide === "LONG" ? "追高风险" : "位置风险") : assetCardRiskNames[type];
     }
     function assetCardRiskReason(snapshot) {
         if (!assetCardRiskMatches(snapshot)) return "风险方向、信号时间或版本尚未匹配当前卡片";
@@ -911,7 +927,6 @@
         var assessed = items.filter(function (item) { return item && Object.prototype.hasOwnProperty.call(assetCardRiskNames, item.type) && item.assessmentStatus === "ASSESSED"; });
         if (assessed.some(function (item) { return item.level === "HIGH"; })) return "HIGH";
         if (assessed.some(function (item) { return item.level === "MEDIUM"; })) return "MEDIUM";
-        if (risk.overallLevel === "HIGH" || risk.overallLevel === "MEDIUM") return risk.overallLevel;
         return risk.overallLevel === "LOW" && Object.keys(assetCardRiskNames).every(function (type) {
             return assessed.some(function (item) { return item.type === type && ["NONE", "LOW"].indexOf(item.level) >= 0; });
         }) ? "LOW" : "UNKNOWN";
@@ -1260,18 +1275,27 @@
         if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
         if (group === "PRICE") scheduleAssetCardPrice(symbol); else patchAssetCard(symbol, group);
     }
-    // Pre-switch renderer from merged main. It is reachable only outside the explicit display cohort.
+    function legacyCardDirection(asset, rawDirection) {
+        // Preserve the pre-switch public projection, not arbitrary status copy as a ninth direction.
+        var known = { STRONG_BULLISH: "强偏多", BULLISH: "偏多", WEAK_BULLISH: "弱偏多",
+            STRONG_BEARISH: "强偏空", BEARISH: "偏空", WEAK_BEARISH: "弱偏空", RANGE: "震荡", WATCH: "观望", WAIT: "观望" };
+        var expected = known[rawDirection];
+        var value = has(asset.marketBiasLabel) ? String(asset.marketBiasLabel).trim() : expected;
+        return expected && value === expected ? value : "—";
+    }
+    // Only outside the explicit display cohort; cleanup never opts another user into private SHADOW results.
     function legacyOpportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
         var ticker = assetTicker(asset);
         var finalDirection = asset.hasFinal === true ? asset.finalMarketBias : asset.marketBias;
-        var direction = has(asset.marketBiasLabel) ? text(asset.marketBiasLabel)
-            : has(finalDirection) ? label(finalDirection, "待重新分析") : "待重新分析";
-        var confidence = desktop.confidenceText(asset);
+        var direction = legacyCardDirection(asset, finalDirection);
+        var confidence = ["—", "震荡", "观望"].indexOf(direction) >= 0 ? "—" : desktop.confidenceText(asset);
         var oneHour = text(asset.oneHourOpportunityLabel, "1小时数据不足");
         var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
-        var price = has(asset.latestPrice) ? "$" + desktop.priceText(asset.latestPrice) : "价格待同步";
+        // This legacy DTO exposes Mark/closed-bar prices, not verified Spot trade identity and expiry.
+        // Hiding its caption must not relabel those values as current Spot prices or read private cardSignal.
+        var price = "—";
         var provenance = assetProvenance(asset);
         var risk = desktop.riskSummary(asset);
         var timeLabel = desktop.directionTimeLabel(asset.directionCalculatedAt);
@@ -1282,20 +1306,19 @@
             + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
             + escapeHtml(text(asset.name, "名称不可用"))
             + '</small></div><div class="asset-price-block"><strong class="opportunity-price" data-live-field="price">' + escapeHtml(price)
-            + '</strong>' + desktop.priceCaption(asset) + '</div></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="semantic-value' + directionSemanticClass(finalDirection) + '">' + escapeHtml(direction)
+            + '</strong></div></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="semantic-value' + directionSemanticClass(direction === "—" ? null : finalDirection) + '">' + escapeHtml(direction)
             + '</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
-            + '</strong></div>' + (risk || asset.homePinned === true ? '<div class="opportunity-facts">' : '')
+            + '</strong></div>' + (risk ? '<div class="opportunity-facts">' : '')
             + (risk ? '<div class="opportunity-risk" data-live-field="risk"'
             + (desktop.hasConfirmedRisks(asset) ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(symbol)
             + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"'
             : '') + '>' + risk + '</div>' : '')
-            + (asset.homePinned === true ? '<div class="pinned-observation-copy">' + escapeHtml(desktop.pinnedObservationLabel(asset)) + '</div>' : '')
-            + (risk || asset.homePinned === true ? '</div>' : '')
+            + (risk ? '</div>' : '')
             + '<div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span>'
             + (timeLabel ? '<time class="opportunity-updated" datetime="' + escapeHtml(asset.directionCalculatedAt)
                 + '" title="' + escapeHtml(timeLabel) + '" aria-label="' + escapeHtml(timeLabel) + '">'
-                + escapeHtml(desktop.beijingTime(asset.directionCalculatedAt, true)) + '</time>' : '')
+                + escapeHtml(assetCardClock(asset.directionCalculatedAt)) + '</time>' : '')
             + '</div></article>';
     }
     function opportunityCard(asset, selected) {
