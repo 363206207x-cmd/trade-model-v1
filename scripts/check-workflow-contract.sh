@@ -820,7 +820,7 @@ emit_handoff_diagnostic() {
   if [[ "${GITHUB_REF:-}" =~ ^refs/pull/([0-9]+)/merge$ ]]; then ci_pr="${BASH_REMATCH[1]}"; fi
   printf 'HANDOFF_DIAGNOSTIC_BEGIN\nSCENARIO=%s\nREQUEST_PACKAGE=%s\nREQUEST_CLASS=%s\nREQUEST_PR=NOT_EMITTED\nCI_PR=%s\nTEST_SCRIPT_HEAD=%s\n' \
     "$scenario" "$request_package" "$request_class" "$ci_pr" "$script_head"
-  printf 'SUBPROCESS_EXIT=%s\nSTATUS_PIPELINE=%s\nREASON_PIPELINE=%s\nTASK_PIPELINE=%s\n' \
+  printf 'ASSERTION_INPUT=HERE_STRING\nSUBPROCESS_EXIT=%s\nSTATUS_PIPELINE=%s\nREASON_PIPELINE=%s\nTASK_PIPELINE=%s\n' \
     "$status" "$status_pipeline" "$reason_pipeline" "$task_pipeline"
   printf 'EXPECTED_STATUS=BLOCKED\nEXPECTED_REASON=%s\nACTUAL_STATUS=%s\nACTUAL_REASON=%s\n' \
     "$expected_reason" "$actual_status" "$actual_reason"
@@ -867,19 +867,19 @@ assert_handoff_blocked() {
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || { fail "handoff scenario must be blocked: $scenario"; anomaly=1; }
-  if printf '%s\n' "$output" | grep -Fq "RESOLUTION_STATUS: BLOCKED"; then
+  if grep -Fq "RESOLUTION_STATUS: BLOCKED" <<<"$output"; then
     status_pipeline=("${PIPESTATUS[@]}")
   else
     status_pipeline=("${PIPESTATUS[@]}")
     fail "blocked handoff scenario omitted blocked status: $scenario"; anomaly=1
   fi
-  if printf '%s\n' "$output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason"; then
+  if grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason" <<<"$output"; then
     reason_pipeline=("${PIPESTATUS[@]}")
   else
     reason_pipeline=("${PIPESTATUS[@]}")
     fail "blocked handoff scenario reason mismatch: $scenario"; anomaly=1
   fi
-  if printf '%s\n' "$output" | grep -Fq "GENERATED_TASK: BLOCKED"; then
+  if grep -Fq "GENERATED_TASK: BLOCKED" <<<"$output"; then
     task_pipeline=("${PIPESTATUS[@]}")
   else
     task_pipeline=("${PIPESTATUS[@]}")
@@ -892,6 +892,30 @@ assert_handoff_blocked() {
     fi
   fi
 }
+
+assert_handoff_large_output_regression() {
+  local padding
+  padding="$(printf '%01048576d' 0)"
+  if (
+    failed=0
+    handoff_diagnostic_dirs=()
+    trap 'handoff_exit_status=$?; if ! cleanup_handoff_diagnostics; then printf "%s\n" "HANDOFF_DIAGNOSTIC_CLEANUP_FAILED" >&2; fi; exit "$handoff_exit_status"' EXIT
+    run_handoff_scenario() {
+      printf 'RESOLUTION_STATUS: BLOCKED\nRESOLUTION_BLOCK_REASON: BLOCKED_UNKNOWN_RESOLVED_STATE\nGENERATED_TASK: BLOCKED\n%s\n' "$padding"
+      return 1
+    }
+    # All matching markers precede more than a pipe buffer of output. The
+    # original subprocess must remain nonzero; successful matching must not
+    # depend on printf surviving an early-closing grep -q reader.
+    assert_handoff_blocked large_output BLOCKED_UNKNOWN_RESOLVED_STATE --request-package V42_UNKNOWN
+    exit "$failed"
+  ); then
+    printf '%s\n' 'HANDOFF_LARGE_OUTPUT_REGRESSION: PASS'
+  else
+    fail "blocked handoff assertion rejected matching large output"
+  fi
+}
+assert_handoff_large_output_regression
 
 authorization_review_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
 authorization_final_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
