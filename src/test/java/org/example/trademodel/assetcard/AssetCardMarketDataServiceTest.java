@@ -1003,6 +1003,26 @@ class AssetCardMarketDataServiceTest {
     }
 
     @Test void loopbackExpiredCheckAbortsExplicitlyAndRecoversWithoutResettingAllowance() throws Exception {
+        var retirementLogged = new java.util.concurrent.CountDownLatch(1);
+        var releaseRetirement = new java.util.concurrent.CountDownLatch(1);
+        var priceCleared = new java.util.concurrent.CountDownLatch(1);
+        var retirementWaitFailed = new java.util.concurrent.atomic.AtomicBoolean();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AssetCardMarketDataService.class);
+        var pause = new ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent>() {
+            @Override protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+                if (!event.getFormattedMessage().startsWith("[asset-card] Spot connection retired reason=COLLECTION_NOT_ACCEPTING")) return;
+                retirementLogged.countDown();
+                try {
+                    if (!releaseRetirement.await(3, java.util.concurrent.TimeUnit.SECONDS)) retirementWaitFailed.set(true);
+                } catch (InterruptedException interrupted) {
+                    retirementWaitFailed.set(true); Thread.currentThread().interrupt();
+                }
+            }
+        };
+        pause.start(); logger.addAppender(pause);
+        service.addListener(update -> {
+            if ("BTCUSDT".equals(update.symbol()) && "PRICE_FAILURE".equals(update.type())) priceCleared.countDown();
+        });
         try (var server = new LoopbackSpotServer(101, false)) {
             configureLoopback(server);
             service.ensureConnected();
@@ -1013,7 +1033,15 @@ class AssetCardMarketDataServiceTest {
             Object lease = org.springframework.test.util.ReflectionTestUtils.getField(service, "collectionLease");
             org.springframework.test.util.ReflectionTestUtils.setField(lease, "checkedAt", Instant.now().minusSeconds(20));
             first.text(trade("btcusdt@aggTrade", "BTCUSDT", 11, "101", Instant.now().minusMillis(5)));
+            assertThat(retirementLogged.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             await(() -> currentSocket() == null);
+            // socket=null is an intermediate state: the deliberately paused lifecycle has not cleared prices yet.
+            assertThat(priceCleared.getCount()).isEqualTo(1);
+            assertThat(service.quote("BTCUSDT", Instant.now())).get().extracting(AssetCardMarketDataService.SpotQuote::tradeId).isEqualTo(10L);
+            releaseRetirement.countDown();
+            assertThat(priceCleared.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(retirementWaitFailed).isFalse();
+            assertThat(currentSocket()).isNull();
             assertThat(service.quote("BTCUSDT", Instant.now())).isEmpty();
             reconnectWithinExistingWindow();
             var second = server.next();
@@ -1022,7 +1050,7 @@ class AssetCardMarketDataServiceTest {
             await(() -> service.quote("BTCUSDT", Instant.now()).map(q -> q.tradeId() == 12).orElse(false));
             assertThat(ledger().path("connections").asLong()).isEqualTo(2);
             assertThat(ledger().path("state").asText()).isEqualTo("OPEN");
-        }
+        } finally { releaseRetirement.countDown(); logger.detachAppender(pause); pause.stop(); }
     }
 
     @Test void loopbackSilentConnectionRetiresButPingAndOtherAssetTrafficKeepItAlive() throws Exception {

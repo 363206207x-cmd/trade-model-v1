@@ -192,6 +192,41 @@ candidate must be checked again; no output or permission was overridden.
 Read-only source review found no remaining P1/P2 in this correction. These WIP
 checks are not the next candidate's full-suite, remote CI or deployment result.
 
+### Third candidate and completed-retirement test synchronization
+
+Candidate `7572956e1777f60527733375bc9ba31a475aa35a` was built in another new,
+initially target-free checkout without clean. Full Maven passed 5,601 tests,
+zero failures/errors and fourteen explicitly recorded local skips; Python 49
+and the frontend matrix passed. Its clean standard JAR embedded that full SHA,
+with SHA-256 `b8c85b4dceda1679535394399116080805058a44f2c31b6815e217eabb0b3b2c`.
+The same JAR passed fifteen real localhost WebSocket scenarios, fourteen
+native-probe/real isolated credential cases and Linux x86_64 LONG/SHORT raw/Beta
+interop with maximum error zero. No fixture was installed as a production model.
+Product Source, task validation, 101 exact-machine cases, full workflow-contract
+and the synchronized real remote-head outer gate passed; source hashes and
+clean identity were unchanged during those checks.
+
+Exact-head workflow run 34700239129 and PR quality run 34700239175 passed.
+Push quality run 34700236489 failed one of 1,605 tests: the real-loopback
+expired-check test observed `socket=null` before the same retirement operation
+had cleared its quote. A bounded test-private logging latch reproducibly paused
+that exact intermediate state: the old immediate-empty assertion failed while
+trade 10 was still present. This is a test completion-observation race, not
+evidence that the completed retirement retains a quote. The correction waits
+for the real BTC PRICE_FAILURE notification, which follows quote removal, then
+retains the original empty-price, successful fresh-trade recovery, connection
+count and unchanged OPEN-budget assertions. It also proves that the intermediate
+state is not the completion signal. The wait is bounded below the unchanged
+10-second price TTL; expiry cannot conceal missing lifecycle cleanup. Production
+connection code, timeouts and permission/budget semantics are unchanged.
+
+Both Linux quality runs executed all fourteen dedicated-writer/ACL and twenty-five
+native-infrastructure cases without skips. Their two opt-in skips lacked the
+fixed Python and retained rollback JAR, separately tested with this local
+candidate. The failed push check is not replaced by the other job's success;
+the test-only follow-up must receive its own full validation, candidate identity,
+remote checks and substantive review before the release conditions are met.
+
 ## V42 stream recovery and stale-price correction — 2026-09-12
 
 This is the same V42 card-only task, not a new model or algorithm. The business
