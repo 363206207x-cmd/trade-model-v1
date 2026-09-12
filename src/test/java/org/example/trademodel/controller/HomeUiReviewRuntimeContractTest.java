@@ -189,9 +189,9 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(oldHtml.includes('<b data-live-field="direction" class="asset-card-weak-short">弱偏空</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">54%%</strong>'), true);
                 const clock = freshHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1];
                 assert.match(clock, /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/);
-                assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:'Asia/Shanghai'})
+                assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
                   .format(new Date(assets[0].cardSignal.signal.signalAsOf)));
-                assert.notEqual(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:'Asia/Shanghai'})
+                assert.notEqual(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
                   .format(new Date(assets[0].cardSignal.cardAsOf)), 'risk/connection update time is not the displayed analysis clock');
                 for (const field of ['featureVersion','modelVersion','calibrationVersion','thresholdVersion']) {
                   for (const invalid of [null,' ',17]) {
@@ -236,7 +236,9 @@ class HomeUiReviewRuntimeContractTest {
                   assert.ok(!legacyHtml.includes('asset-price-caption')&&!legacyHtml.includes('pinned-observation-copy'));
                   assert.ok(!legacyHtml.includes('最近闭线价')&&!legacyHtml.includes('实时价')&&!legacyHtml.includes('置顶观察'));
                   assert.equal((legacyHtml.match(/<time\\b/g)||[]).length,1);
-                  assert.match(legacyHtml,new RegExp('class="opportunity-updated"[^>]*>08:00:00</time>'));
+                  assert.equal(legacyHtml.match(new RegExp('class="opportunity-updated"[^>]*>([^<]*)</time>'))[1],
+                    new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                      .format(new Date(legacy.directionCalculatedAt)));
                   assert.equal(assetCardSnapshots.get('SOLUSDT'),undefined,'legacy does not consume attached private cardSignal');
                   const unavailable=opportunityCard({...legacy,marketBiasLabel:'暂不可判断',finalConfidence:60},'SOLUSDT');
                   assert.match(unavailable,new RegExp('data-live-field="direction"[^>]*>—</b>'));

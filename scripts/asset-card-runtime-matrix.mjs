@@ -117,7 +117,7 @@ function boundEvent(type, version, value, overrides = {}) {
     riskBasisSide: value.risk.riskBasisSide, riskBasisDirection: value.risk.riskBasisDirection,
     riskBasisSignalAsOf: value.risk.riskBasisSignalAsOf, ...overrides });
 }
-// Recovery is a narrow withdrawal of an older disproved Spot failure, not a new risk/model version.
+// Real price recovers independently; risk recovery requires a newly committed atomic snapshot.
 function spotRecoveryFixture(version = 10, directional = false, independentRisk = false) {
   const runtime = fixture(Date.parse("2026-09-12T08:00:12Z")), failure = boundSnapshot("LONG", version);
   failure.signal = { ...failure.signal, direction: directional ? "LONG" : null, status: directional ? "INVALIDATED" : "SHADOW",
@@ -146,12 +146,14 @@ for (const path of ["PRICE", "CARD_GET", "HOME", "RISK_HEALTH_THEN_PRICE"]) for 
   for (const independentRisk of [false, true]) {
     const { runtime, failure, recovered } = spotRecoveryFixture(version, version > 0, independentRisk);
     const before = runtime.snapshot("BTCUSDT"), analysis = JSON.stringify(before.signal), clock = before.cardAsOf;
+    const committedRisk = JSON.stringify(before.risk);
     if (path === "CARD_GET") { runtime.setApi(async () => [recovered]); await runtime.lightweightHomeRefresh(); }
     else if (path === "HOME") {
       const html = runtime.opportunityCard({ ...runtime.home.assets[0], cardSignal: recovered }, "BTCUSDT");
       // The real Home renderer installs this returned HTML; the narrow fixture models those two nodes.
       runtime.nodes.get("BTCUSDT").fields.get("risk").textContent = html.match(/data-live-field="risk"[^>]*>([^<]*)/)[1];
       runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML = html.match(/class="asset-card-risk-items"[^>]*>(.*?)<\/div>/)[1];
+      runtime.nodes.get("BTCUSDT").fields.get("status").textContent = html.match(/data-live-field="status"[^>]*>([^<]*)/)[1];
     }
     else {
       if (path === "RISK_HEALTH_THEN_PRICE") {
@@ -161,19 +163,39 @@ for (const path of ["PRICE", "CARD_GET", "HOME", "RISK_HEALTH_THEN_PRICE"]) for 
       runtime.applyAssetCardEvent(event("PRICE", version, recovered));
     }
     runtime.flushPrices();
-    const assertRecovered = () => {
+    const assertPriceRecoveredRiskPending = () => {
       const value = runtime.snapshot("BTCUSDT"), data = value.risk.items.find(item => item.type === "DATA");
-      assert.equal(data.assessmentStatus, "UNKNOWN", `${path}/v${version}: fresh real trade must withdraw old DATA despite equal durable versions`);
-      assert.equal(data.level, null); assert.notEqual(data.evidenceValue, "SPOT_SOURCE_UNAVAILABLE");
-      assert.equal(value.risk.items.length, 8); assert.equal(value.risk.overallLevel, independentRisk ? "HIGH" : null);
+      assert.equal(JSON.stringify(value.risk), committedRisk, `${path}/v${version}: fresh PRICE cannot rewrite risk before durable CAS`);
+      assert.equal(value.spotPrice, 101);
+      assert.equal(data.assessmentStatus, "ASSESSED"); assert.equal(data.level, "HIGH");
+      assert.equal(data.evidenceValue, "SPOT_SOURCE_UNAVAILABLE");
+      assert.equal(value.risk.items.length, 8); assert.equal(value.risk.overallLevel, "HIGH");
       assert.equal(value.snapshotVersion, version); assert.equal(JSON.stringify(value.signal), analysis); assert.equal(value.cardAsOf, clock);
+      assert.equal(runtime.nodes.get("BTCUSDT").fields.get("status").textContent,
+        version > 0 ? "已失效" : "风险恢复待保存", "recovery status cannot hide model invalidation or claim committed risk recovery");
       if (independentRisk) assert.equal(value.risk.items.find(item => item.type === "EVENT"), failure.risk.items.find(item => item.type === "EVENT"));
-      assert.ok(!runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"), `${path}/v${version}: revoked DATA must leave the visible risk list`);
+      assert.ok(runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"), `${path}/v${version}: retain last committed evidence and its observation time`);
     };
-    assertRecovered();
+    assertPriceRecoveredRiskPending();
     runtime.applyAssetCardEvent(boundEvent("RISK", version, recovered));
     runtime.applyAssetCardEvent(boundEvent("HEALTH", version, failure));
-    runtime.mergeAssetCardSnapshot(failure, true); runtime.flushPrices(); assertRecovered();
+    runtime.mergeAssetCardSnapshot(failure, true); runtime.flushPrices(); assertPriceRecoveredRiskPending();
+    const committedRecovery = { ...recovered, snapshotVersion: version + 1 };
+    runtime.applyAssetCardEvent(boundEvent("RISK", version + 1, committedRecovery));
+    const restored = runtime.snapshot("BTCUSDT");
+    assert.equal(restored.snapshotVersion, version + 1);
+    assert.equal(JSON.stringify(restored.risk), JSON.stringify(committedRecovery.risk), "only the next committed RISK changes the displayed evidence");
+    assert.equal(restored.risk.items.find(item => item.type === "DATA").assessmentStatus, "UNKNOWN");
+    assert.equal(restored.risk.overallLevel, independentRisk ? "HIGH" : null);
+    assert.equal(JSON.stringify(restored.signal), analysis);
+    assert.equal(runtime.nodes.get("BTCUSDT").fields.get("card-time").textContent,
+      runtime.assetCardClock(restored.signal.signalAsOf), "risk commit does not change the analysis timestamp");
+    assert.notEqual(runtime.nodes.get("BTCUSDT").fields.get("status").textContent, "风险恢复待保存");
+    assert.ok(!runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"));
+    runtime.applyAssetCardEvent(boundEvent("RISK", version, failure));
+    runtime.applyAssetCardEvent(boundEvent("HEALTH", version, failure));
+    runtime.mergeAssetCardSnapshot(failure, true);
+    assert.equal(runtime.snapshot("BTCUSDT").risk, restored.risk, "old failure cannot return after committed recovery");
     const risk = runtime.snapshot("BTCUSDT").risk, target = runtime.nodes.get("BTCUSDT").fields.get("risk-items");
     let html = target.innerHTML, paints = 0;
     Object.defineProperty(target, "innerHTML", { get: () => html, set(value) { html = value; paints++; } });
@@ -223,10 +245,13 @@ for (const mutateRisk of [
   runtime.setHomeLoader(async () => {});
   runtime.startHomeLiveRuntime(); runtime.visible(false);
   runtime.applyAssetCardEvent(event("PRICE", 10, recovered)); runtime.flushPrices();
-  assert.equal(runtime.snapshot("BTCUSDT").risk.items.find(item => item.type === "DATA").assessmentStatus, "UNKNOWN");
+  assert.equal(runtime.snapshot("BTCUSDT").risk.items.find(item => item.type === "DATA").assessmentStatus, "ASSESSED");
   assert.ok(runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"), "hidden price paint is deferred");
   runtime.visible(true);
-  assert.ok(!runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"), "visibility recovery paints the already accepted evidence even without another GET/frame");
+  assert.equal(runtime.nodes.get("BTCUSDT").fields.get("price").textContent, "$101");
+  assert.ok(runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"), "visibility cannot invent durable risk recovery");
+  runtime.applyAssetCardEvent(boundEvent("RISK", 11, recovered));
+  assert.ok(!runtime.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML.includes("数据·高"));
 }
 // Regression: a newer complete safety projection must revoke the old price on every read/event path.
 for (const path of ["CARD_GET", "HOME", "SSE"]) for (const shadow of [false, true]) {
@@ -588,7 +613,8 @@ for (const basis of ["CLOSED_5M", "LIVE", "UNKNOWN"]) {
   const html = legacy.opportunityCard(asset, "BTCUSDT");
   assert.ok(html.includes('data-live-field="confidence">99%'), "valid legacy direction/confidence stays outside the new cohort");
   assert.equal((html.match(/<time\b/g) || []).length, 1, "legacy cards have only the analysis clock, never a price-caption clock");
-  assert.match(html, /class="opportunity-updated"[^>]*>08:00:00<\/time>/);
+  assert.equal(html.match(/class="opportunity-updated"[^>]*>([^<]*)<\/time>/)[1],
+    legacy.assetCardClock(asset.directionCalculatedAt));
   const field = legacy.nodes.get("BTCUSDT").fields.get("price"); field.textContent = "—";
   legacy.applyHomeLiveEvent({ eventType: "ASSET_PRICE_UPDATED", symbol: "BTCUSDT", snapshotVersion: 20,
     payload: { price: 88888, latestPrice: 88888, source: "BINANCE_MARK_PRICE_WEBSOCKET", latestPriceAt: priceInstant(20) } });
@@ -1037,8 +1063,15 @@ if (!process.env.ASSET_CARD_CLOCK_CHILD) {
     assert.equal(child.status, 0, child.stderr);
   }
 } else {
-  const expected = "08:00:00";
+  const expected = { UTC: "00:00:00", "Asia/Shanghai": "08:00:00", "America/New_York": "20:00:00" }[process.env.TZ];
   assert.equal(f.assetCardClock("2026-09-10T00:00:00Z"), expected);
   assert.equal(f.assetCardClock(null), "—");
+  const localClock = fixture(), value = snapshot(); localClock.mergeAssetCardSnapshot(value, true);
+  const target = localClock.nodes.get("BTCUSDT").fields.get("card-time");
+  assert.equal(target.textContent, expected);
+  assert.equal(target.attributes.datetime, value.signal.signalAsOf);
+  localClock.applyAssetCardEvent(event("PRICE", 2, { spotPrice: 102 })); localClock.flushPrices();
+  assert.equal(target.textContent, expected, "real price updates never change the user's analysis clock");
+  assert.equal(target.attributes.datetime, value.signal.signalAsOf);
 }
 console.log("ASSET_CARD_RUNTIME_MATRIX: PASS (rendering, field isolation, versions, clocks, polling, frozen geometry)");

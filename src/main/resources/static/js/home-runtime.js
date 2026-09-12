@@ -778,7 +778,7 @@
     function assetCardClock(value) {
         var date = assetCardDate(value);
         return date ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit",
-            hourCycle: "h23", timeZone: "Asia/Shanghai" }).format(date) : "—";
+            hourCycle: "h23" }).format(date) : "—";
     }
     function assetCardHasVisibleSignal(snapshot) {
         var signal = snapshot && snapshot.signal;
@@ -819,6 +819,7 @@
         if (signal.status === "INVALIDATED") return "已失效";
         if (snapshot && snapshot.priceExpired === true) return "价格过期";
         if (snapshot && snapshot.priceUnavailable === true) return "价格不可用";
+        if (assetCardRiskRecoveryPending(snapshot)) return "风险恢复待保存";
         if (assetCardDirection(snapshot) === "—") return "数据不足";
         var state = String(snapshot && snapshot.health && snapshot.health.status || "").toUpperCase();
         if (["HEALTHY", "OK", "NORMAL", "READY", "UP"].indexOf(state) >= 0) return "";
@@ -975,28 +976,21 @@
                 return !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === risk[key];
             });
     }
-    function assetCardSpotRecovery(snapshot) {
+    function assetCardRiskRecoveryPending(snapshot) {
+        if (!snapshot) return false;
         var priceState = assetCardFieldVersions.get(snapshot.symbol + "|PRICE");
         var observed = assetCardDate(snapshot.latestPriceAt);
         if (!priceState || !observed || !assetCardPriceIsCurrent(snapshot)
                 || String(snapshot.priceTradeId) !== priceState.tradeId || observed.getTime() !== priceState.observedAt
-                || !assetCardRiskMatches(snapshot) || !Array.isArray(snapshot.risk.items)) return snapshot;
-        var changed = false;
-        var items = snapshot.risk.items.map(function (item) {
+                || !assetCardRiskMatches(snapshot) || !Array.isArray(snapshot.risk.items)) return false;
+        // Explain the still-committed evidence without mutating its value, level, identity or observation time.
+        // A fresh trade updates PRICE only; the background writer must commit the recovered risk via CAS.
+        return snapshot.risk.items.some(function (item) {
             var at = assetCardDate(item && item.asOf);
-            if (!item || item.type !== "DATA" || item.evidenceValue !== "SPOT_SOURCE_UNAVAILABLE"
-                    || item.unit !== "SOURCE_STATE" || !at || at >= observed) return item;
-            changed = true;
-            // The accepted real trade disproves this older source claim, not the other data/risk evidence.
-            return { type: "DATA", assessmentStatus: "UNKNOWN", level: null, evidenceValue: null,
-                source: null, asOf: null, unit: null, hardInvalidation: false, invalidatesSignal: false,
-                reason: "现货成交已恢复，其他数据证据待重新评估" };
+            return item && item.type === "DATA" && item.assessmentStatus === "ASSESSED"
+                && item.evidenceValue === "SPOT_SOURCE_UNAVAILABLE" && item.unit === "SOURCE_STATE"
+                && item.source === "BINANCE_SPOT_AGG_TRADE" && at && at < observed;
         });
-        if (!changed) return snapshot;
-        var assessed = items.filter(function (item) { return item && item.assessmentStatus === "ASSESSED"; });
-        var level = assessed.some(function (item) { return item.level === "HIGH"; }) ? "HIGH"
-            : assessed.some(function (item) { return item.level === "MEDIUM"; }) ? "MEDIUM" : null;
-        return Object.assign({}, snapshot, { risk: Object.assign({}, snapshot.risk, { items: items, overallLevel: level }) });
     }
     function mergeAssetCardPrice(symbol, payload) {
         var tradeId = payload.priceTradeId, observed = assetCardDate(payload.latestPriceAt);
@@ -1011,7 +1005,7 @@
             spotPrice: payload.spotPrice, latestPriceAt: payload.latestPriceAt, priceTradeId: tradeId,
             priceValidUntil: payload.priceValidUntil, priceExpired: false, priceUnavailable: false });
         assetCardFieldVersions.set(symbol + "|PRICE", { tradeId: String(tradeId), observedAt: observed.getTime(), failureAt: previous.failureAt });
-        assetCardSnapshots.set(symbol, assetCardSpotRecovery(next));
+        assetCardSnapshots.set(symbol, next);
         scheduleAssetCardExpiry();
         return true;
     }
@@ -1047,7 +1041,7 @@
             if (clock && (!previousClock || clock >= previousClock)) next.cardAsOf = payload.cardAsOf;
         }
         assetCardFieldVersions.set(identity, version);
-        assetCardSnapshots.set(symbol, assetCardSpotRecovery(next));
+        assetCardSnapshots.set(symbol, next);
         return true;
     }
     function patchAssetCardField(card, field, value, className) {
@@ -1062,10 +1056,6 @@
         if (group === "PRICE") {
             patchAssetCardField(card, "price", assetCardPrice(snapshot));
             card.setAttribute("data-card-price-at", snapshot.latestPriceAt || "");
-            var riskSummary = card.querySelector('[data-live-field="risk"]');
-            var riskItems = card.querySelector('[data-live-field="risk-items"]');
-            if (riskSummary && (riskSummary.textContent !== assetCardRiskLabel(assetCardOverallRisk(snapshot))
-                    || riskItems && riskItems.innerHTML !== assetCardRiskItemsHtml(snapshot))) patchAssetCard(symbol, "RISK");
         }
         if (group === "SIGNAL") {
             var frames = assetCardTimeframes(snapshot);
@@ -1075,7 +1065,7 @@
             patchAssetCardField(card, "four-hour", frames.fourHour);
             card.setAttribute("aria-label", "查看 " + symbol + " 首页资产上下文；" + assetCardDirection(snapshot) + "；置信度 " + assetCardConfidence(snapshot));
         }
-        if (group === "SIGNAL" || group === "HEALTH" || group === "PRICE") {
+        if (group === "SIGNAL" || group === "RISK" || group === "HEALTH" || group === "PRICE") {
             var status = assetCardStatus(snapshot);
             patchAssetCardField(card, "status", status);
             var statusNode = card.querySelector('[data-live-field="status"]');
@@ -1221,7 +1211,7 @@
         safe.risk = assetCardRiskEnvelopeMatches(snapshot, safe) ? snapshot.risk
             : previousRiskStillUsable ? current.risk : assetCardUnknownRisk(safe,
                 sourceUnavailable ? "现货来源不可用；当前风险证据未通过身份校验" : "当前模型不可用，方向风险需重新评估");
-        assetCardSnapshots.set(symbol, assetCardSpotRecovery(safe));
+        assetCardSnapshots.set(symbol, safe);
         if (sourceUnavailable) assetCardFieldVersions.set(symbol + "|PRICE", Object.assign({}, priceState, {
             failureAt: Math.max(priceState.failureAt || 0, failureAt.getTime()) }));
         scheduleAssetCardExpiry();

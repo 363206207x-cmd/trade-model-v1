@@ -78,6 +78,20 @@ public class AssetCardService implements AutoCloseable {
         Thread thread = new Thread(task, "asset-card-label-maturity"); thread.setDaemon(true); return thread;
     });
     private final Map<String, AssetCardMarketDataService.SpotQuote> pendingTrades = new ConcurrentHashMap<>();
+    private static final class PendingTradeWrite {
+        private final AssetCardMarketDataService.SpotQuote quote;
+        private final AssetCardFeatureService.Observation observation;
+        private final String encoded;
+        private int attempts;
+        private String status = "PENDING";
+        private PendingTradeWrite(AssetCardMarketDataService.SpotQuote quote,
+                                  AssetCardFeatureService.Observation observation, String encoded) {
+            this.quote = quote; this.observation = observation; this.encoded = encoded;
+        }
+    }
+    // One frozen sampled point plus the latest unselected point per symbol; neither is a durable restart queue.
+    private final Map<String, PendingTradeWrite> pendingTradeWrites = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicBoolean tradeFlushInProgress = new java.util.concurrent.atomic.AtomicBoolean();
     private enum Field { PRICE, SIGNAL, RISK, PERSISTENCE, RECOVERY }
     private final Map<Field, Map<String, String>> fieldFailures = new EnumMap<>(Field.class);
     private final ScheduledExecutorService background = Executors.newSingleThreadScheduledExecutor(task -> {
@@ -247,21 +261,56 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private void flushTradeObservations() {
-        if (!writerReady) return;
-        if (properties.isExternalCallsEnabled() && !market.collectionAccepting(Instant.now())) { pendingTrades.clear(); return; }
-        pendingTrades.forEach((symbol, quote) -> {
-            if (!persistenceAllowed()) return;
-            if (!pendingTrades.remove(symbol, quote)) return;
-            try {
-                var observation = tradeObservation(quote);
-                String encoded = json.writeValueAsString(
-                        payload("observation", observation, "quantity", quote.quantity(), "sampling", "LATEST_ACTUAL_AGG_TRADE_PER_ONE_SECOND_FLUSH",
-                                "dataKind", "LIVE_OBSERVED_CARD_TRADE"));
-                persistCard(symbol, () -> mapper.saveTradeObservation(quote, observation.instrument(), observation.sourceVersion(), encoded));
-            } catch (RuntimeException | JsonProcessingException failure) {
-                failed(Field.PERSISTENCE, symbol, "真实成交观察保存失败，标签不得补造");
+        if (!started || !writerReady || !persistenceAllowed() || !tradeFlushInProgress.compareAndSet(false, true)) return;
+        try {
+            // Retry the selected immutable sample before selecting another. New ingress keeps coalescing separately.
+            var symbols = new LinkedHashSet<>(pendingTradeWrites.keySet()); symbols.addAll(pendingTrades.keySet());
+            for (String symbol : symbols) {
+                if (!started || !persistenceAllowed()) return; // Never clear pending evidence at window expiry/stop.
+                var pending = pendingTradeWrites.get(symbol);
+                if (pending == null) {
+                    var quote = pendingTrades.get(symbol);
+                    if (quote == null) continue;
+                    var observation = tradeObservation(quote);
+                    String encoded;
+                    try {
+                        encoded = json.writeValueAsString(payload("observation", observation, "quantity", quote.quantity(),
+                                "sampling", "LATEST_ACTUAL_AGG_TRADE_PER_ONE_SECOND_FLUSH", "dataKind", "LIVE_OBSERVED_CARD_TRADE"));
+                    } catch (JsonProcessingException invalid) {
+                        pending = new PendingTradeWrite(quote, observation, null); pending.status = "UNPERSISTED";
+                        pendingTradeWrites.put(symbol, pending); pendingTrades.remove(symbol, quote);
+                        failed(Field.PERSISTENCE, symbol, "真实成交观察编码失败，卡片采集已停止，原始观察仅保留于当前进程");
+                        market.stopCollection("TRADE_OBSERVATION_ENCODING_FAILED", Instant.now()); return;
+                    }
+                    pending = new PendingTradeWrite(quote, observation, encoded);
+                    pendingTradeWrites.put(symbol, pending);
+                    pendingTrades.remove(symbol, quote); // A concurrently received newer quote must remain queued.
+                }
+                if (!"PENDING".equals(pending.status)) continue;
+                if (!started || !persistenceAllowed()) return;
+                pending.attempts++;
+                var selected = pending;
+                try {
+                    if (persistCard(symbol, () -> {
+                        int saved = mapper.saveTradeObservation(selected.quote, selected.observation.instrument(),
+                                selected.observation.sourceVersion(), selected.encoded);
+                        // Zero is the mapper's immutable-identity conflict result, including an ambiguous prior commit.
+                        if (saved < 0 || saved > 1) throw new IllegalStateException("CARD_TRADE_WRITE_RESULT_INVALID");
+                    })) {
+                        pending.status = "PERSISTED"; pendingTradeWrites.remove(symbol, pending); continue;
+                    }
+                } catch (RuntimeException failure) {
+                    failed(Field.PERSISTENCE, symbol, "真实成交观察尚未确认保存，原始观察保留待重试");
+                }
+                if (pending.attempts >= 3) {
+                    pending.status = "UNPERSISTED";
+                    failed(Field.PERSISTENCE, symbol, "真实成交观察写入重试耗尽，卡片采集已停止，原始观察仅保留于当前进程");
+                    log.error("[asset-card] Trade observation UNPERSISTED symbol={} tradeId={} observedAt={} availableAt={} attempts={}",
+                            symbol, pending.quote.tradeId(), pending.quote.observedAt(), pending.quote.availableAt(), pending.attempts);
+                    market.stopCollection("TRADE_OBSERVATION_PERSISTENCE_RETRY_EXHAUSTED", Instant.now()); return;
+                }
             }
-        });
+        } finally { tradeFlushInProgress.set(false); }
     }
 
     private AssetCardFeatureService.Observation tradeObservation(AssetCardMarketDataService.SpotQuote quote) {
@@ -897,8 +946,8 @@ public class AssetCardService implements AutoCloseable {
                 quote == null ? "Binance现货成交数据尚未就绪或已过期" : null, quote == null ? at : priceAt);
         var signal = current.signal();
         var risk = current.risk();
-        // Withdraw an obsolete Spot-source claim in the background CAS path as well as the read-only
-        // projection. A newer real trade does not restore a model result or any other missing evidence.
+        // Only this background CAS path may withdraw a committed Spot-source risk. Fresh prices remain
+        // independently readable while persistence is blocked; reads must retain the committed risk.
         if (quote != null && risk != null && risk.matchesBasis(signal)
                 && Objects.equals(risk.riskVersion(), riskVersion(model))
                 && !quote.observedAt().isAfter(at) && at.isBefore(quote.observedAt().plus(properties.getPriceTtl())))
@@ -1151,7 +1200,6 @@ public class AssetCardService implements AutoCloseable {
                 && quote.observedAt().isAfter(health.asOf());
         boolean priceMissing = currentPrice == null || currentPriceAt == null || currentPriceAt.isAfter(now)
                 || !now.isBefore(priceValidUntil) || sourceWasLost && !recoveryTrade;
-        if (!priceMissing && quote != null) risk = recoveredSpotRisk(risk, quote.observedAt());
         if (priceMissing) {
             signal = signal.direction() != null ? signal.invalidated() : signal;
             risk = sourceLostRisk(signal, risk, now, model);

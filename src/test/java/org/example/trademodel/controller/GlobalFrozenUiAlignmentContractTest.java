@@ -280,8 +280,11 @@ class GlobalFrozenUiAlignmentContractTest {
                     assert.ok(!projection.includes('asset-card-risk-low">低'));
                     const detail=assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT'));
                     assert.equal((detail.match(/risk-evidence-item/g)||[]).length,1);
-                    assert.ok(detail.includes('ISOLATED_SIGNED_FACT')&&detail.includes('09:00:02'));
-                    assert.match(projection,new RegExp('data-live-field="card-time"[^>]*>09:00:00</time>'));
+                    const userClock=value=>new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
+                      .format(new Date(value));
+                    assert.ok(detail.includes('ISOLATED_SIGNED_FACT')&&detail.includes(userClock('2026-09-08T01:00:02Z')));
+                    assert.equal(projection.match(new RegExp('data-live-field="card-time"[^>]*>([^<]*)</time>'))[1],
+                      userClock(signal.signalAsOf));
                     assert.equal(assetCardSnapshots.get('TESTUSDT').risk.items.length,8);
                     if(direction==='RANGE')assert.ok(projection.includes('data-live-field="confidence">—'));
                 }

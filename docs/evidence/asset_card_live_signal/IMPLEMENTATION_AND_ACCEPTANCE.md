@@ -227,6 +227,77 @@ candidate. The failed push check is not replaced by the other job's success;
 the test-only follow-up must receive its own full validation, candidate identity,
 remote checks and substantive review before the release conditions are met.
 
+### Fourth candidate review: atomic risk recovery and immutable trade admission
+
+Candidate `e0c67417150de6b23cb7ff2b779080d6812a1fec` passed a fresh,
+initially target-free full build: 5,601 tests, zero failures/errors, fourteen
+explicit local skips, Python 49 and the frontend matrix. Its standard JAR
+embedded that exact clean identity and SHA-256
+`cbee44ac495cfe3b0963d51016271338781a29b1cd9ecf9b4c29db3f514598d1`.
+The same JAR passed fifteen localhost lifecycle scenarios, fourteen native/real
+isolated credential checks and Linux x86_64 LONG/SHORT raw/Beta fixture parity.
+Exact-head workflow 34701670637 and both quality runs 34701670740/34701667073
+passed. Each quality run executed 1,605 tests with zero failures/errors and two
+known opt-in skips; Linux writer/ACL and native-infrastructure cases ran without
+skips. These results identify e0 only, not its subsequent source corrections.
+
+The substantive e0 review still identified two P1 issues, so it was not merged.
+A fresh trade must not rewrite previously committed risk in a read-only GET or
+browser PRICE merge, even when it disproves an older Spot-source claim. Recovery
+must allocate, persist and publish one real background CAS version. While that
+write is blocked, price remains independently current, the committed risk and
+its observation time/version remain intact, and a compact pending status can
+explain the recovery. Only an accepted committed RISK snapshot withdraws the
+old source fault. Unrelated HIGH evidence, invalidated prediction status and the
+analysis clock remain intact. This supersedes the earlier proposed read-only
+withdrawal described above; it does not relax field identity or version checks.
+
+The trade-admission regression first reproduced two lost-sample failures. The
+correction freezes the original selected quote, observation and full serialized
+payload before bounded retries, independently coalescing the newest unselected
+trade. A single flush can be active, each write uses the original collection
+lease, and at most three admissions are attempted. Exhaustion stops only that
+original window and explicitly retains UNPERSISTED evidence in process memory;
+STOP does not clear the pending points or permit another write. This is not a
+durable restart queue. Six focused tests passed with zero failures/errors/skips,
+including a real disposable H2 insert-then-exception test proving that an
+ambiguous committed result retries the identical identity/payload without a
+duplicate row. Control-flow doubles are not claimed as new PostgreSQL permission
+or real-runtime evidence. Existing PostgreSQL isolation checks remain required.
+
+Appendix I.5 requires the card corner clock to use the browser's user timezone.
+The card-only formatter and exact UTC/Shanghai/New York expectations are
+corrected accordingly; shared alert/service Beijing-time functions are unchanged.
+Earlier fixed-Beijing card evidence is historical, not the current contract.
+For INVALIDATED display, the latest Owner instruction explicitly requires
+"方向 — · 置信 —" when no valid direction/model/identity/complete prediction
+exists. The internal original direction and risk basis remain available for
+audit, with a separate "已失效" status; no opposite signal is synthesized. That
+newer narrow display instruction is supplied for substantive review rather than
+silently resolving the older Appendix I.3 review or editing governance to match.
+
+Frontend RED checks reproduced same-version risk mutation and the UTC clock
+mismatch. The corrected event matrix passed, including version zero and later
+versions, PRICE/GET/Home interleaving, visibility recovery, independent HIGH
+evidence, committed-risk recovery and stale replay rejection. Both card-only
+JavaScript fixtures embedded in Java contract tests also ran in all three
+timezones. Three backend regressions first failed with three assertions and no
+errors, then passed with zero failures/errors/skips after removing the read-only
+recovery mutation. They cover both admission stages, failed CAS, permanent STOP,
+unchanged full risk JSON/asOf/version in GET and SSE, and exactly one background
+commit/event after capacity returns without another trade. A following flush
+produces no duplicate write or event. The complete new candidate build, its remote
+checks and review must still be recorded after execution. The combined WIP
+focused run passed 543 tests across 22 classes, zero failures/errors and one
+local LinuxKit ACL capability skip; Python 49, the complete frontend event
+matrix, JS syntax and diff checks also passed. Generated WIP identity was the
+actual e0 parent with dirty=true, never a release artifact. The whole PR remains
+eleven files inside the unchanged 64 exact paths. Product Source, task validation,
+101 exact-machine cases, complete workflow-contract and syntax/diff checks passed;
+nine source/continuation anchors remain ancestors. The synchronized clean final
+candidate still needs its own real outer admission. No current production model,
+deployed page, new external request or new collection window is claimed.
+
 ## V42 stream recovery and stale-price correction — 2026-09-12
 
 This is the same V42 card-only task, not a new model or algorithm. The business
